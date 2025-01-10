@@ -89,7 +89,6 @@ module.exports = tseslint.config(
             '@typescript-eslint/no-namespace': 'error',
             '@typescript-eslint/no-unnecessary-parameter-property-assignment': 'error',
             'no-useless-constructor': 'off',
-            '@typescript-eslint/no-var-requires': 'error',
             '@typescript-eslint/no-useless-constructor': 'error',
             '@typescript-eslint/no-wrapper-object-types': 'error',
             '@typescript-eslint/non-nullable-type-assertion-style': 'error',
@@ -165,7 +164,6 @@ module.exports = tseslint.config(
             'getter-return': 'error',
             'grouped-accessor-pairs': 'error',
             'guard-for-in': 'error',
-            'implicit-arrow-linebreak': 'error',
             'logical-assignment-operators': 'error',
             'max-depth': 'error',
             'no-async-promise-executor': 'error',
@@ -409,7 +407,7 @@ module.exports = tseslint.config(
             '@stylistic/type-annotation-spacing': 'error',
             '@stylistic/type-generic-spacing': 'error',
             '@stylistic/type-named-tuple-spacing': 'error',
-            '@stylistic/yield-star-spacing': 'error'
+            '@stylistic/yield-star-spacing': 'error',
         },
     }
 
