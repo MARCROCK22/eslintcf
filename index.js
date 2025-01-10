@@ -3,7 +3,7 @@
 const eslint = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const perfectionist = require('eslint-plugin-perfectionist')
-const stylistic = require('@stylistic/eslint-plugin').default;
+const stylistic = require('@stylistic/eslint-plugin');
 
 module.exports = tseslint.config(
     {
