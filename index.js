@@ -5,6 +5,7 @@ const tseslint = require('typescript-eslint');
 const perfectionist = require('eslint-plugin-perfectionist')
 const stylistic = require('@stylistic/eslint-plugin');
 
+
 module.exports = tseslint.config(
     {
         ignores: [
@@ -409,6 +410,14 @@ module.exports = tseslint.config(
             '@stylistic/type-named-tuple-spacing': 'error',
             '@stylistic/yield-star-spacing': 'error',
         },
+    },
+    {
+        plugins: {
+            marcrock: require('./rules/_.js')
+        },
+        rules: {
+            'marcrock/uppercase-first-class-letter': 'error',
+            'marcrock/no-newline-if-body-class-empty': 'error'
+        }
     }
-
 );
