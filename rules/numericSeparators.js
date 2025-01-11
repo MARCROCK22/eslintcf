@@ -9,7 +9,19 @@ module.exports =
             create(context) {
                 return {
                     Literal(node) {
-                        if (!(typeof node.value === 'number' && !Number.isNaN(node.value) && node.value >= 1e3)) {
+                        if (typeof node.value !== 'number' || Number.isNaN(node.value)) {
+                            return
+                        }
+                        if (node.value < 1e3) {
+                            if (node.raw.includes('_')) {
+                                return context.report({
+                                    messageId: 'nosecomoponerle2',
+                                    node: node,
+                                    fix(fixer) {
+                                        return fixer.replaceText(node, node.value.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, "_"))
+                                    }
+                                })
+                            }
                             return
                         }
 
@@ -34,7 +46,8 @@ module.exports =
                         'Forced to use numeric separators',
                 },
                 messages: {
-                    nosecomoponerle: 'Number its not using numeric separators'
+                    nosecomoponerle: 'Number its not using numeric separators',
+                    nosecomoponerle2: 'Number its too low for using numeric separators'
                 },
                 type: 'problem',
                 schema: [],
