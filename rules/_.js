@@ -14,6 +14,8 @@ const plugin = {
         'no-newline-if-body-class-empty': require('./noNewlineIfBodyClassEmptyRule')(createRule),
         // @ts-expect-error
         'use-filenaming-convention': require('./useFilenamingConvention')(createRule),
+        // @ts-expect-error
+        'numeric-separators': require('./numericSeparators')(createRule),
     }
 }
 

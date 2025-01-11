@@ -16,7 +16,7 @@ module.exports =
                     Program(node) {
                         if (regex !== undefined && !context.filename.match(regex)) {
                             context.report({
-                                messageId: 'doesnotmatch',
+                                messageId: 'nosecomoponerle',
                                 node: node
                             })
                         }
@@ -30,7 +30,7 @@ module.exports =
                         'Enforce naming conventions for JavaScript and TypeScript filenames.',
                 },
                 messages: {
-                    doesnotmatch: 'Filename does not match regex.',
+                    nosecomoponerle: 'Filename does not match regex.',
                 },
                 type: 'problem',
                 schema: [{

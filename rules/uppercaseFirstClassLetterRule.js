@@ -12,7 +12,7 @@ module.exports =
                         if (node.id != null) {
                             if (/^[a-z]/.test(node.id.name)) {
                                 context.report({
-                                    messageId: 'uppercase',
+                                    messageId: 'nosecomoponerle',
                                     node: node.id,
                                 });
                             }
@@ -27,7 +27,7 @@ module.exports =
                         'Class declaration names should start with an upper-case letter.',
                 },
                 messages: {
-                    uppercase: 'Start this name with an upper-case letter.',
+                    nosecomoponerle: 'Start this name with an upper-case letter.',
                 },
                 type: 'suggestion',
                 schema: [],
