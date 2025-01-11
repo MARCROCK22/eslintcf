@@ -9,7 +9,7 @@ module.exports =
             create(context) {
                 return {
                     Literal(node) {
-                        if (!(typeof node.value === 'number' && !Number.isNaN(node.value) && node.value > 1e3)) {
+                        if (!(typeof node.value === 'number' && !Number.isNaN(node.value) && node.value >= 1e3)) {
                             return
                         }
 
