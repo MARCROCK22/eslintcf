@@ -15,7 +15,7 @@ module.exports =
 
                         const split = node.raw.split('_')
 
-                        if (split.some(str => str.length > 3)) {
+                        if (split.some((str, i) => str.length > 3 || (i !== 0 && str.length < 3))) {
                             return context.report({
                                 messageId: 'nosecomoponerle',
                                 node: node,
