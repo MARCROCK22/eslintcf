@@ -12,6 +12,8 @@ const plugin = {
         'uppercase-first-class-letter': require('./uppercaseFirstClassLetterRule')(createRule),
         // @ts-expect-error
         'no-newline-if-body-class-empty': require('./noNewlineIfBodyClassEmptyRule')(createRule),
+        // @ts-expect-error
+        'use-filenaming-convention': require('./useFilenamingConvention')(createRule),
     }
 }
 

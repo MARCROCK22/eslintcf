@@ -349,6 +349,7 @@ module.exports = tseslint.config(
     },
     {
         plugins: {
+            // @ts-expect-error
             '@stylistic': stylistic
         },
         rules: {
@@ -417,7 +418,8 @@ module.exports = tseslint.config(
         },
         rules: {
             'marcrock/uppercase-first-class-letter': 'error',
-            'marcrock/no-newline-if-body-class-empty': 'error'
+            'marcrock/no-newline-if-body-class-empty': 'error',
+            'marcrock/use-filenaming-convention': 'error'
         }
     }
 );
