@@ -1,18 +1,18 @@
-// @ts-check
+import perfectionist from 'eslint-plugin-perfectionist';
+import stylistic from '@stylistic/eslint-plugin';
+import tseslint from 'typescript-eslint';
+import eslint from '@eslint/js';
 
-const eslint = require('@eslint/js');
-const tseslint = require('typescript-eslint');
-const perfectionist = require('eslint-plugin-perfectionist')
-const stylistic = require('@stylistic/eslint-plugin');
+import rules from './rules/_.js';
 
-
-module.exports = tseslint.config(
+export default tseslint.config(
     {
         ignores: [
             'dist/**/*.ts',
             'dist/**',
             '**/*.mjs',
             'eslint.config.mjs',
+            'eslint.config.cjs',
             '**/*.js',
         ],
     },
@@ -40,14 +40,14 @@ module.exports = tseslint.config(
             '@typescript-eslint/no-unused-vars': [
                 'error',
                 {
-                    'args': 'all',
-                    'argsIgnorePattern': '^_',
-                    'caughtErrors': 'all',
-                    'caughtErrorsIgnorePattern': '^_',
-                    'destructuredArrayIgnorePattern': '^_',
-                    'varsIgnorePattern': '^_',
-                    'ignoreRestSiblings': true
-                }
+                    args: 'all',
+                    argsIgnorePattern: '^_',
+                    caughtErrors: 'all',
+                    caughtErrorsIgnorePattern: '^_',
+                    destructuredArrayIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    ignoreRestSiblings: true,
+                },
             ],
             '@typescript-eslint/no-unsafe-enum-comparison': 'off',
             '@typescript-eslint/ban-tslint-comment': 'off',
@@ -58,8 +58,8 @@ module.exports = tseslint.config(
             'no-array-constructor': 'off',
             '@typescript-eslint/no-array-constructor': 'error',
             '@typescript-eslint/consistent-type-imports': ['error', {
-                fixStyle: 'separate-type-imports'
-            }],
+                fixStyle: 'separate-type-imports',
+            },],
             '@typescript-eslint/class-literal-property-style': 'error',
             '@typescript-eslint/no-unnecessary-type-assertion': 'error',
             '@typescript-eslint/adjacent-overload-signatures': 'error',
@@ -100,8 +100,8 @@ module.exports = tseslint.config(
             '@typescript-eslint/restrict-template-expressions': 'error',
             '@typescript-eslint/return-await': 'error',
             '@typescript-eslint/switch-exhaustiveness-check': ['error', {
-                'considerDefaultExhaustiveForUnions': true
-            }],
+                considerDefaultExhaustiveForUnions: true,
+            },],
             '@typescript-eslint/unified-signatures': 'error',
             '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
             '@typescript-eslint/only-throw-error': 'error',
@@ -121,9 +121,10 @@ module.exports = tseslint.config(
             '@typescript-eslint/prefer-function-type': 'error',
             '@typescript-eslint/prefer-includes': 'error',
             '@typescript-eslint/prefer-nullish-coalescing': ['error', {
-                ignorePrimitives: true
-            }],
-            '@typescript-eslint/prefer-optional-chain': 'error', 'prefer-promise-reject-errors': 'off',
+                ignorePrimitives: true,
+            },],
+            '@typescript-eslint/prefer-optional-chain': 'error',
+            'prefer-promise-reject-errors': 'off',
             '@typescript-eslint/prefer-promise-reject-errors': 'error',
             'no-unused-expressions': 'off',
             '@typescript-eslint/no-unused-expressions': 'error',
@@ -138,11 +139,11 @@ module.exports = tseslint.config(
             'no-unmodified-loop-condition': 'error',
             'no-unreachable-loop': 'error',
             '@typescript-eslint/no-use-before-define': ['error', {
-                'functions': false,
-                'classes': false,
-                'variables': true,
-                'allowNamedExports': true
-            }],
+                functions: false,
+                classes: false,
+                variables: true,
+                allowNamedExports: true,
+            },],
             '@typescript-eslint/prefer-reduce-type-parameter': 'error',
             '@typescript-eslint/prefer-return-this-type': 'error',
             '@typescript-eslint/prefer-regexp-exec': 'error',
@@ -155,10 +156,10 @@ module.exports = tseslint.config(
             'capitalized-comments': 'error',
             'consistent-this': 'error',
             'constructor-super': 'error',
-            'curly': 'error',
+            curly: 'error',
             'default-case-last': 'error',
             'dot-notation': 'error',
-            'eqeqeq': 'error',
+            eqeqeq: 'error',
             'for-direction': 'error',
             'func-name-matching': 'error',
             'func-names': 'error',
@@ -273,84 +274,84 @@ module.exports = tseslint.config(
             'prefer-rest-params': 'error',
             'prefer-spread': 'error',
             'prefer-template': 'error',
-            'radix': ['error', 'as-needed'],
+            radix: ['error', 'as-needed',],
             'require-yield': 'error',
             'sort-vars': 'error',
-            'strict': 'error',
+            strict: 'error',
             'symbol-description': 'error',
             'unicode-bom': 'error',
             'use-isnan': 'error',
             'valid-typeof': 'error',
             'vars-on-top': 'error',
-            'yoda': 'error',
+            yoda: 'error',
             'perfectionist/sort-array-includes': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-classes': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-decorators': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-enums': 'off',
             'perfectionist/sort-exports': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-heritage-clauses': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-imports': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-interfaces': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-intersection-types': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-maps': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-named-exports': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-named-imports': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-object-types': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-objects': 'off',
             'perfectionist/sort-sets': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-switch-case': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
             'perfectionist/sort-union-types': ['error', {
                 type: 'line-length',
-                order: 'desc'
-            }],
+                order: 'desc',
+            },],
         },
     },
     {
         plugins: {
             // @ts-expect-error
-            '@stylistic': stylistic
+            '@stylistic': stylistic,
         },
         rules: {
             '@stylistic/array-bracket-spacing': 'error',
@@ -358,16 +359,19 @@ module.exports = tseslint.config(
             '@stylistic/arrow-spacing': 'error',
             '@stylistic/block-spacing': 'error',
             '@stylistic/brace-style': 'error',
-            '@stylistic/comma-dangle': ['error', 'never'],
+            '@stylistic/comma-dangle': ['error', 'never',],
             '@stylistic/comma-spacing': 'error',
             '@stylistic/comma-style': 'error',
             '@stylistic/computed-property-spacing': 'error',
-            '@stylistic/dot-location': ['error', 'property'],
+            '@stylistic/dot-location': ['error', 'property',],
             '@stylistic/eol-last': 'error',
-            '@stylistic/function-call-argument-newline': ['error', 'consistent'],
+            '@stylistic/function-call-argument-newline': ['error', 'consistent',],
             '@stylistic/function-call-spacing': 'error',
-            '@stylistic/function-paren-newline': ['error', 'consistent'],
-            '@stylistic/generator-star-spacing': ['error', { 'before': true, 'after': false }],
+            '@stylistic/function-paren-newline': ['error', 'consistent',],
+            '@stylistic/generator-star-spacing': ['error', {
+                before: true,
+                after: false,
+            },],
             '@stylistic/implicit-arrow-linebreak': 'error',
             '@stylistic/key-spacing': 'error',
             '@stylistic/keyword-spacing': 'error',
@@ -384,23 +388,23 @@ module.exports = tseslint.config(
             '@stylistic/no-whitespace-before-property': 'error',
             '@stylistic/nonblock-statement-body-position': 'error',
             '@stylistic/object-curly-newline': 'error',
-            '@stylistic/object-curly-spacing': ['error', 'always'],
+            '@stylistic/object-curly-spacing': ['error', 'always',],
             '@stylistic/object-property-newline': 'error',
             '@stylistic/one-var-declaration-per-line': 'error',
-            '@stylistic/quote-props': ['error', 'as-needed'],
-            '@stylistic/quotes': ['error', 'single'],
+            '@stylistic/quote-props': ['error', 'as-needed',],
+            '@stylistic/quotes': ['error', 'single',],
             '@stylistic/rest-spread-spacing': 'error',
             '@stylistic/semi': 'error',
             '@stylistic/semi-spacing': 'error',
             '@stylistic/semi-style': 'error',
             '@stylistic/space-before-blocks': 'error',
-            '@stylistic/space-before-function-paren': ["error", {
-                "anonymous": "always",
-                "named": "never",
-                "asyncArrow": "always"
-            }],
+            '@stylistic/space-before-function-paren': ['error', {
+                anonymous: 'always',
+                named: 'never',
+                asyncArrow: 'always',
+            },],
             '@stylistic/space-in-parens': 'error',
-            '@stylistic/space-infix-ops': ['error', { 'int32Hint': false }],
+            '@stylistic/space-infix-ops': ['error', { int32Hint: false, },],
             '@stylistic/space-unary-ops': 'error',
             '@stylistic/spaced-comment': 'error',
             '@stylistic/switch-colon-spacing': 'error',
@@ -414,12 +418,12 @@ module.exports = tseslint.config(
     },
     {
         plugins: {
-            marcrock: require('./rules/_.js')
+            marcrock: rules,
         },
         rules: {
             'marcrock/uppercase-first-class-letter': 'error',
             'marcrock/no-newline-if-body-class-empty': 'error',
             'marcrock/numeric-separators': 'error',
-        }
+        },
     }
 );

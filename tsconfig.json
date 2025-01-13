@@ -1,0 +1,37 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"lib": [
+			"ESNext"
+		],
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+		"sourceMap": false,
+		"strict": true,
+		"esModuleInterop": true,
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+		"preserveConstEnums": true,
+		/* Type Checking */
+		"noImplicitAny": true,
+		"strictNullChecks": true,
+		"strictFunctionTypes": true,
+		"noImplicitThis": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"skipLibCheck": true,
+		"noErrorTruncation": true,
+		"outDir": "./dist",
+		"stripInternal": true,
+		"declaration": true
+	},
+	"exclude": [
+		"**/dist",
+		"**/__test__"
+	],
+	"include": [
+		"src"
+	]
+}
