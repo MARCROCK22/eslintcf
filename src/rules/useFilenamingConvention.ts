@@ -3,9 +3,6 @@ import type { ESLintUtils, } from '@typescript-eslint/utils';
 export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCreator>) {
     return createRule({
         create(context, options) {
-            /**
-             * @type {RegExp|undefined}
-            */
             // @ts-expect-error
             const regex: undefined | RegExp = options[0].match instanceof RegExp
                 // @ts-expect-error

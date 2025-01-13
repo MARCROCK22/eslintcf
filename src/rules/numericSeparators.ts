@@ -3,11 +3,6 @@ import type { ESLintUtils, } from '@typescript-eslint/utils';
 export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCreator>) {
     return createRule({
         create(context) {
-
-            /**
-             *
-             * @param {string} str
-             */
             function parseNumber(str: string) {
                 return str.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, '_');
             }
