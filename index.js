@@ -419,7 +419,7 @@ module.exports = tseslint.config(
         rules: {
             'marcrock/uppercase-first-class-letter': 'error',
             'marcrock/no-newline-if-body-class-empty': 'error',
-            'marcrock/numeric-separators': 'error'
+            'marcrock/numeric-separators': 'error',
         }
     }
 );

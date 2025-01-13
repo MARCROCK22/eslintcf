@@ -7,32 +7,35 @@ module.exports =
     function create(createRule) {
         return createRule({
             create(context) {
+
+                /**
+                 * 
+                 * @param {string} str 
+                 */
+                function parseNumber(str) {
+                    return str.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, "_");
+                }
+
                 return {
                     Literal(node) {
-                        if (typeof node.value !== 'number' || Number.isNaN(node.value)) {
-                            return
-                        }
-                        if (node.value < 1e3) {
-                            if (node.raw.includes('_')) {
-                                return context.report({
-                                    messageId: 'nosecomoponerle2',
-                                    node: node,
-                                    fix(fixer) {
-                                        return fixer.replaceText(node, node.value.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, "_"))
-                                    }
-                                })
-                            }
+                        const value = node.value;
+                        if ((typeof value !== 'number' && typeof value !== 'bigint') || Number.isNaN(value)) {
                             return
                         }
 
-                        const split = node.raw.split('_')
+                        if (['e', '0x', '0b'].some(t => node.raw.includes(t)))
+                            return;
 
-                        if (split.some((str, i) => str.length > 3 || (i !== 0 && str.length < 3))) {
+                        const [first, second] = node.raw.replaceAll('_', '').split('.')
+
+                        const result = `${parseNumber(first ?? '')}${second ? `.${parseNumber(second)}` : ''}`;
+
+                        if (result !== node.raw) {
                             return context.report({
                                 messageId: 'nosecomoponerle',
                                 node: node,
                                 fix(fixer) {
-                                    return fixer.replaceText(node, node.value.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, "_"))
+                                    return fixer.replaceText(node, result)
                                 }
                             })
                         }
@@ -46,8 +49,7 @@ module.exports =
                         'Forced to use numeric separators',
                 },
                 messages: {
-                    nosecomoponerle: 'Number its not using numeric separators',
-                    nosecomoponerle2: 'Number its too low for using numeric separators'
+                    nosecomoponerle: 'Number its not using numeric separators as expected',
                 },
                 type: 'problem',
                 schema: [],
