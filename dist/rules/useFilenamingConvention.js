@@ -1,9 +1,6 @@
 export default function create(createRule) {
     return createRule({
         create(context, options) {
-            /**
-             * @type {RegExp|undefined}
-            */
             // @ts-expect-error
             const regex = options[0].match instanceof RegExp
                 // @ts-expect-error
