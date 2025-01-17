@@ -1,4 +1,5 @@
 import type { ESLintUtils, } from '@typescript-eslint/utils';
+import path from "path"
 
 export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCreator>) {
     return createRule({
@@ -10,9 +11,12 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                 : undefined;
             return {
                 Program(node) {
-                    if (regex !== undefined && !context.filename.match(regex)) {
+                    const filename = path.basename(context.filename)
+
+                    if (regex !== undefined && !regex.test(filename)) {
                         context.report({
-                            messageId: 'nosecomoponerle',
+                            messageId: 'invalidFilename',
+                            data: { filename },
                             node,
                         });
                     }
@@ -22,11 +26,10 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
         name: 'use-filenaming-convention',
         meta: {
             docs: {
-                description:
-                    'Enforce naming conventions for JavaScript and TypeScript filenames.',
+                description: 'Enforce naming conventions for JavaScript and TypeScript filenames.',
             },
             messages: {
-                nosecomoponerle: 'Filename does not match regex.',
+                invalidFilename: 'The filename "{{ filename }}" does not follow the naming convention.',
             },
             type: 'problem',
             schema: [{
