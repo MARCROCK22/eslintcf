@@ -11,14 +11,14 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                 : undefined;
             return {
                 Program(node) {
-                    const filename = path.basename(context.filename)
-
-                    if (regex !== undefined && !regex.test(filename)) {
-                        context.report({
-                            messageId: 'invalidFilename',
-                            data: { filename },
-                            node,
-                        });
+                    if (regex !== undefined) {
+                        const filename = path.basename(context.filename)
+                        if (!regex.test(filename))
+                            context.report({
+                                messageId: 'invalidFilename',
+                                data: { filename },
+                                node,
+                            });
                     }
                 },
             };
