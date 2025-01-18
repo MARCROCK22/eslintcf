@@ -1,3 +1,4 @@
+import path from "path";
 export default function create(createRule) {
     return createRule({
         create(context, options) {
@@ -8,9 +9,11 @@ export default function create(createRule) {
                 : undefined;
             return {
                 Program(node) {
-                    if (regex !== undefined && !context.filename.match(regex)) {
+                    const filename = path.basename(context.filename);
+                    if (regex !== undefined && !regex.test(filename)) {
                         context.report({
-                            messageId: 'nosecomoponerle',
+                            messageId: 'invalidFilename',
+                            data: { filename },
                             node,
                         });
                     }
@@ -23,7 +26,7 @@ export default function create(createRule) {
                 description: 'Enforce naming conventions for JavaScript and TypeScript filenames.',
             },
             messages: {
-                nosecomoponerle: 'Filename does not match regex.',
+                invalidFilename: 'The filename "{{ filename }}" does not follow the naming convention.',
             },
             type: 'problem',
             schema: [{
