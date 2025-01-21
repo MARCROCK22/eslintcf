@@ -148,7 +148,7 @@ export default tseslint.config({
         'require-atomic-updates': 'error',
         'arrow-body-style': 'error',
         'block-scoped-var': 'error',
-        'capitalized-comments': 'error',
+        'capitalized-comments': 'off',
         'consistent-this': 'error',
         'constructor-super': 'error',
         curly: 'error',
