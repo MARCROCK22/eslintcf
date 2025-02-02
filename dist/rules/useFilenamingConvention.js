@@ -7,19 +7,22 @@ export default function create(createRule) {
                 // @ts-expect-error
                 ? options[0].match
                 : undefined;
-            return {
-                Program(node) {
-                    if (regex !== undefined) {
-                        const filename = path.basename(context.filename);
-                        if (!regex.test(filename))
-                            context.report({
-                                messageId: 'invalidFilename',
-                                data: { filename },
-                                node,
-                            });
-                    }
-                },
-            };
+            if (regex)
+                return {
+                    Program(node) {
+                        if (regex !== undefined) {
+                            const filename = path.basename(context.filename);
+                            if (!regex.test(filename))
+                                context.report({
+                                    messageId: 'invalidFilename',
+                                    data: { filename },
+                                    node,
+                                });
+                        }
+                    },
+                };
+            else
+                return {};
         },
         name: 'use-filenaming-convention',
         meta: {

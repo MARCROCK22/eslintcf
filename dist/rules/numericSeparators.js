@@ -1,9 +1,6 @@
 export default function create(createRule) {
     return createRule({
         create(context) {
-            function parseNumber(str) {
-                return str.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, '_');
-            }
             return {
                 Literal(node) {
                     const value = node.value;
@@ -43,4 +40,7 @@ export default function create(createRule) {
         },
         defaultOptions: [],
     });
+}
+function parseNumber(str) {
+    return str.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, '_');
 }
