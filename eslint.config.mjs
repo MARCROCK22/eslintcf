@@ -1,8 +1,8 @@
-const theConfig = require("./dist/index.js");
-const { config } = require("typescript-eslint")
+import theConfig from "./dist/index.js";
+import { config } from "typescript-eslint"
 
-module.exports = config(
-    theConfig.default,
+export default config(
+    theConfig,
     {
         languageOptions: {
             parserOptions: {

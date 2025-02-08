@@ -51,7 +51,7 @@ export default tseslint.config({
         '@typescript-eslint/no-array-constructor': 'error',
         '@typescript-eslint/consistent-type-imports': ['error', {
                 fixStyle: 'separate-type-imports',
-                disallowTypeAnnotations: false
+                disallowTypeAnnotations: false,
             },],
         '@typescript-eslint/class-literal-property-style': 'error',
         '@typescript-eslint/no-unnecessary-type-assertion': 'error',
@@ -142,6 +142,7 @@ export default tseslint.config({
         '@typescript-eslint/prefer-regexp-exec': 'error',
         '@typescript-eslint/prefer-string-starts-ends-with': 'error',
         '@typescript-eslint/related-getter-setter-pairs': 'error',
+        '@typescript-eslint/no-shadow': 'error',
         'no-dupe-class-members': 'off',
         '@typescript-eslint/no-dupe-class-members': 'error',
         'no-useless-assignment': 'error',
@@ -234,7 +235,7 @@ export default tseslint.config({
         'no-self-assign': 'error',
         'no-sequences': 'error',
         'no-setter-return': 'error',
-        'no-shadow': 'error',
+        'no-shadow': 'off',
         'no-shadow-restricted-names': 'error',
         'no-sparse-arrays': 'error',
         'no-this-before-super': 'error',
@@ -283,7 +284,7 @@ export default tseslint.config({
                 order: 'desc',
             },],
         'perfectionist/sort-classes': ['error', {
-                type: 'line-length',
+                type: 'alphabetical',
                 order: 'desc',
             },],
         'perfectionist/sort-decorators': ['error', {

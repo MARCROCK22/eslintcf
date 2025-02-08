@@ -1,4 +1,4 @@
-import path from "path";
+import path from 'path';
 export default function create(createRule) {
     return createRule({
         create(context, options) {
@@ -7,22 +7,21 @@ export default function create(createRule) {
                 // @ts-expect-error
                 ? options[0].match
                 : undefined;
-            if (regex)
+            if (regex) {
                 return {
                     Program(node) {
-                        if (regex !== undefined) {
-                            const filename = path.basename(context.filename);
-                            if (!regex.test(filename))
-                                context.report({
-                                    messageId: 'invalidFilename',
-                                    data: { filename },
-                                    node,
-                                });
+                        const filename = path.basename(context.filename);
+                        if (!regex.test(filename)) {
+                            context.report({
+                                messageId: 'invalidFilename',
+                                data: { filename, },
+                                node,
+                            });
                         }
                     },
                 };
-            else
-                return {};
+            }
+            return {};
         },
         name: 'use-filenaming-convention',
         meta: {

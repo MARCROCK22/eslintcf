@@ -1,5 +1,6 @@
 import type { ESLintUtils, } from '@typescript-eslint/utils';
-import path from "path"
+
+import path from 'path';
 
 export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCreator>) {
     return createRule({
@@ -9,21 +10,21 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                 // @ts-expect-error
                 ? options[0].match
                 : undefined;
-            if (regex)
+            if (regex) {
                 return {
                     Program(node) {
-                        if (regex !== undefined) {
-                            const filename = path.basename(context.filename)
-                            if (!regex.test(filename))
-                                context.report({
-                                    messageId: 'invalidFilename',
-                                    data: { filename },
-                                    node,
-                                });
+                        const filename = path.basename(context.filename);
+                        if (!regex.test(filename)) {
+                            context.report({
+                                messageId: 'invalidFilename',
+                                data: { filename, },
+                                node,
+                            });
                         }
                     },
-                }
-            else return {}
+                };
+            }
+            return {};
         },
         name: 'use-filenaming-convention',
         meta: {
