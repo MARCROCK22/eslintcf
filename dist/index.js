@@ -281,16 +281,10 @@ export default tseslint.config({
         yoda: 'error',
         'perfectionist/sort-array-includes': ['error', {
                 type: 'line-length',
-                order: 'desc',
+                order: 'alphabetical',
             },],
-        'perfectionist/sort-classes': ['error', {
-                type: 'alphabetical',
-                order: 'desc',
-            },],
-        'perfectionist/sort-decorators': ['error', {
-                type: 'line-length',
-                order: 'desc',
-            },],
+        'perfectionist/sort-classes': 'off',
+        'perfectionist/sort-decorators': 'off',
         'perfectionist/sort-enums': 'off',
         'perfectionist/sort-exports': ['error', {
                 type: 'line-length',
@@ -311,7 +305,7 @@ export default tseslint.config({
             },],
         'perfectionist/sort-maps': ['error', {
                 type: 'line-length',
-                order: 'desc',
+                order: 'alphabetical',
             },],
         'perfectionist/sort-named-exports': ['error', {
                 type: 'line-length',
@@ -325,12 +319,9 @@ export default tseslint.config({
         'perfectionist/sort-objects': 'off',
         'perfectionist/sort-sets': ['error', {
                 type: 'line-length',
-                order: 'desc',
+                order: 'alphabetical',
             },],
-        'perfectionist/sort-switch-case': ['error', {
-                type: 'line-length',
-                order: 'desc',
-            },],
+        'perfectionist/sort-switch-case': 'off',
         'perfectionist/sort-union-types': ['error', {
                 type: 'line-length',
                 order: 'desc',
