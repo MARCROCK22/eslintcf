@@ -146,7 +146,7 @@ export default tseslint.config({
         'no-dupe-class-members': 'off',
         '@typescript-eslint/no-dupe-class-members': 'error',
         'no-useless-assignment': 'error',
-        'require-atomic-updates': 'error',
+        'require-atomic-updates': 'off',
         'arrow-body-style': 'error',
         'block-scoped-var': 'error',
         'capitalized-comments': 'off',
