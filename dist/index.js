@@ -90,7 +90,13 @@ export default tseslint.config({
         '@typescript-eslint/require-await': 'error',
         'no-throw-literal': 'off',
         '@typescript-eslint/restrict-plus-operands': 'error',
-        '@typescript-eslint/restrict-template-expressions': 'error',
+        '@typescript-eslint/restrict-template-expressions': ['error', {
+                allowNullish: false,
+                allowNever: false,
+                allowAny: false,
+                allowArray: false,
+                allowRegExp: false,
+            },],
         '@typescript-eslint/return-await': 'error',
         '@typescript-eslint/switch-exhaustiveness-check': ['error', {
                 considerDefaultExhaustiveForUnions: true,
