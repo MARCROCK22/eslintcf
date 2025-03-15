@@ -348,7 +348,6 @@ export default tseslint.config(
     },
     {
         plugins: {
-            // @ts-expect-error
             '@stylistic': stylistic,
         },
         rules: {
@@ -412,6 +411,9 @@ export default tseslint.config(
             '@stylistic/type-generic-spacing': 'error',
             '@stylistic/type-named-tuple-spacing': 'error',
             '@stylistic/yield-star-spacing': 'error',
+            '@stylistic/newline-per-chained-call': ['error', {
+                ignoreChainWithDepth: 1,
+            },],
         },
     },
     {

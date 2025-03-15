@@ -9,13 +9,13 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@eslint/js": "^9.20.0",
-    "@stylistic/eslint-plugin": "^3.0.1",
-    "@types/node": "^22.13.1",
-    "@typescript-eslint/utils": "^8.23.0",
-    "eslint": "^9.20.0",
-    "eslint-plugin-perfectionist": "^4.8.0",
-    "typescript-eslint": "^8.23.0"
+    "@eslint/js": "^9.22.0",
+    "@stylistic/eslint-plugin": "^4.2.0",
+    "@types/node": "^22.13.10",
+    "@typescript-eslint/utils": "^8.26.1",
+    "eslint": "^9.22.0",
+    "eslint-plugin-perfectionist": "^4.10.1",
+    "typescript-eslint": "^8.26.1"
   },
   "peerDependencies": {
     "@eslint/js": "^9.17.0",
