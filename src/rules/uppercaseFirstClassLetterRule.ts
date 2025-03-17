@@ -8,7 +8,7 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                     if (node.id !== null) {
                         if (/^[a-z]/.test(node.id.name)) {
                             context.uppercaseFirstClassLeter({
-                                messageId: 'nosecomoponerle',
+                                messageId: 'uppercaseFirstClassLeter',
                                 node: node.id,
                             });
                         }
