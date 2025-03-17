@@ -39,7 +39,7 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                     'Forced to use numeric separators',
             },
             messages: {
-                nosecomoponerle: 'Number its not using numeric separators as expected',
+                numericSeparators: 'Number its not using numeric separators as expected',
             },
             type: 'problem',
             schema: [],
