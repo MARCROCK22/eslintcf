@@ -23,7 +23,7 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                     'Class declaration names should start with an upper-case letter.',
             },
             messages: {
-                nosecomoponerle: 'Start this name with an upper-case letter.',
+                uppercaseFirstClassLeter: 'Start this name with an upper-case letter.',
             },
             type: 'suggestion',
             schema: [],
