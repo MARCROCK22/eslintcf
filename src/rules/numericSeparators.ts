@@ -22,7 +22,7 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
 
                     if (result !== node.raw) {
                         context.report({
-                            messageId: 'nosecomoponerle',
+                            messageId: 'numericSeparators',
                             node,
                             fix(fixer) {
                                 return fixer.replaceText(node, result);
