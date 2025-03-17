@@ -11,7 +11,7 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                     }
                     if (context.sourceCode.getCommentsInside(node).length === 0 && node.body.length === 0) {
                         context.report({
-                            messageId: 'nosecomoponerle',
+                            messageId: 'noNewLine',
                             node,
                             fix(fixer) {
                                 return fixer.removeRange([
