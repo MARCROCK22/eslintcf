@@ -30,7 +30,7 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                     'No newline if body class is empty.',
             },
             messages: {
-                nosecomoponerle: 'XDXDDXXD??',
+                noNewLine: 'Empty body class should not have a newline.',
             },
             type: 'suggestion',
             schema: [],
