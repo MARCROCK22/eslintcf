@@ -9,7 +9,7 @@ export default function create(createRule) {
                     }
                     if (context.sourceCode.getCommentsInside(node).length === 0 && node.body.length === 0) {
                         context.report({
-                            messageId: 'nosecomoponerle',
+                            messageId: 'noNewLine',
                             node,
                             fix(fixer) {
                                 return fixer.removeRange([
@@ -27,7 +27,7 @@ export default function create(createRule) {
                 description: 'No newline if body class is empty.',
             },
             messages: {
-                nosecomoponerle: 'XDXDDXXD??',
+                noNewLine: 'Empty body class should not have a newline.',
             },
             type: 'suggestion',
             schema: [],

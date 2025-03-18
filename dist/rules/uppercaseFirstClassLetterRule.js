@@ -6,7 +6,7 @@ export default function create(createRule) {
                     if (node.id !== null) {
                         if (/^[a-z]/.test(node.id.name)) {
                             context.report({
-                                messageId: 'nosecomoponerle',
+                                messageId: 'uppercaseFirstClassLeter',
                                 node: node.id,
                             });
                         }
@@ -20,7 +20,7 @@ export default function create(createRule) {
                 description: 'Class declaration names should start with an upper-case letter.',
             },
             messages: {
-                nosecomoponerle: 'Start this name with an upper-case letter.',
+                uppercaseFirstClassLeter: 'Start this name with an upper-case letter.',
             },
             type: 'suggestion',
             schema: [],

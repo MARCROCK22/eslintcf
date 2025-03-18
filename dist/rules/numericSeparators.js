@@ -16,7 +16,7 @@ export default function create(createRule) {
                         : ''}`;
                     if (result !== node.raw) {
                         context.report({
-                            messageId: 'nosecomoponerle',
+                            messageId: 'numericSeparators',
                             node,
                             fix(fixer) {
                                 return fixer.replaceText(node, result);
@@ -32,7 +32,7 @@ export default function create(createRule) {
                 description: 'Forced to use numeric separators',
             },
             messages: {
-                nosecomoponerle: 'Number its not using numeric separators as expected',
+                numericSeparators: 'Number its not using numeric separators as expected',
             },
             type: 'problem',
             schema: [],
