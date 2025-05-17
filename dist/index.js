@@ -54,7 +54,9 @@ export default tseslint.config({
                 disallowTypeAnnotations: false,
             },],
         '@typescript-eslint/class-literal-property-style': 'error',
-        '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+        '@typescript-eslint/no-unnecessary-type-assertion': ['error', {
+                allowConstantLoopConditions: 'only-allowed-literals',
+            },],
         '@typescript-eslint/adjacent-overload-signatures': 'error',
         '@typescript-eslint/array-type': 'error',
         '@typescript-eslint/await-thenable': 'error',
