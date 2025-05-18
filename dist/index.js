@@ -54,9 +54,7 @@ export default tseslint.config({
                 disallowTypeAnnotations: false,
             },],
         '@typescript-eslint/class-literal-property-style': 'error',
-        '@typescript-eslint/no-unnecessary-type-assertion': ['error', {
-                allowConstantLoopConditions: 'only-allowed-literals',
-            },],
+        '@typescript-eslint/no-unnecessary-type-assertion': 'error',
         '@typescript-eslint/adjacent-overload-signatures': 'error',
         '@typescript-eslint/array-type': 'error',
         '@typescript-eslint/await-thenable': 'error',
@@ -81,7 +79,13 @@ export default tseslint.config({
         '@typescript-eslint/no-redundant-type-constituents': 'error',
         '@typescript-eslint/no-mixed-enums': 'error',
         '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',
-        '@typescript-eslint/no-unnecessary-condition': 'error',
+        '@typescript-eslint/no-unnecessary-condition': [
+            'error',
+            {
+                allowConstantLoopConditions: 'only-allowed-literals',
+                checkTypePredicates: true,
+            },
+        ],
         '@typescript-eslint/no-namespace': 'error',
         '@typescript-eslint/no-unnecessary-parameter-property-assignment': 'error',
         'no-useless-constructor': 'off',
