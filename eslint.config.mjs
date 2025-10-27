@@ -1,7 +1,7 @@
+import { defineConfig } from 'eslint/config';
 import theConfig from "./dist/index.js";
-import { config } from "typescript-eslint"
 
-export default config(
+export default defineConfig(
     theConfig,
     {
         languageOptions: {

@@ -1,11 +1,12 @@
 import perfectionist from 'eslint-plugin-perfectionist';
 import stylistic from '@stylistic/eslint-plugin';
+import { defineConfig, } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 import eslint from '@eslint/js';
 
 import rules from './rules/_.js';
 
-export default tseslint.config(
+export default defineConfig(
     {
         ignores: [
             'dist/**/*.ts',
