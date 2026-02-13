@@ -71,7 +71,7 @@ export default defineConfig(
             '@typescript-eslint/no-confusing-non-null-assertion': 'error',
             '@typescript-eslint/no-confusing-void-expression': 'error',
             '@typescript-eslint/no-extra-non-null-assertion': 'error',
-            '@typescript-eslint/no-deprecated': 'error',
+            '@typescript-eslint/no-deprecated': 'off',
             '@typescript-eslint/no-extraneous-class': 'error',
             '@typescript-eslint/no-floating-promises': 'error',
             '@typescript-eslint/no-for-in-array': 'error',
