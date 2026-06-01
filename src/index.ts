@@ -1,6 +1,7 @@
 import perfectionist from 'eslint-plugin-perfectionist';
 import stylistic from '@stylistic/eslint-plugin';
 import { defineConfig, } from 'eslint/config';
+import unicorn from 'eslint-plugin-unicorn';
 import tseslint from 'typescript-eslint';
 import eslint from '@eslint/js';
 
@@ -418,6 +419,16 @@ export default defineConfig(
             '@stylistic/type-generic-spacing': 'error',
             '@stylistic/type-named-tuple-spacing': 'error',
             '@stylistic/yield-star-spacing': 'error',
+        },
+    },
+    {
+        plugins: {
+            unicorn,
+        },
+        rules: {
+            'unicorn/prefer-at': ['error', {
+                checkAllIndexAccess: true,
+            },],
         },
     },
     {
