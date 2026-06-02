@@ -3,7 +3,6 @@ import uppercaseFirstClassLetterRule from './uppercaseFirstClassLetterRule.js';
 import noNewlineIfBodyClassEmptyRule from './noNewlineIfBodyClassEmptyRule.js';
 import useFilenamingConvention from './useFilenamingConvention.js';
 import numericSeparators from './numericSeparators.js';
-import preferAt from './preferAt.js';
 const createRule = ESLintUtils.RuleCreator((name) => `https://example.com/rule/${name}`);
 const plugin = {
     rules: {
@@ -15,8 +14,6 @@ const plugin = {
         'use-filenaming-convention': useFilenamingConvention(createRule),
         // @ts-expect-error
         'numeric-separators': numericSeparators(createRule),
-        // @ts-expect-error
-        'prefer-at': preferAt(createRule),
     },
 };
 export default plugin;

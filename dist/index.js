@@ -427,6 +427,11 @@ export default defineConfig({
     plugins: {
         unicorn,
     },
+    rules: {
+        'unicorn/prefer-at': ['error', {
+                checkAllIndexAccess: true,
+            },],
+    },
 }, {
     plugins: {
         marcrock: rules,
@@ -435,8 +440,5 @@ export default defineConfig({
         'marcrock/uppercase-first-class-letter': 'error',
         'marcrock/no-newline-if-body-class-empty': 'error',
         'marcrock/numeric-separators': 'error',
-        'marcrock/prefer-at': ['error', {
-                checkAllIndexAccess: true,
-            },],
     },
 });

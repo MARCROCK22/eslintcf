@@ -553,9 +553,6 @@ export default defineConfig(
             'marcrock/uppercase-first-class-letter': 'error',
             'marcrock/no-newline-if-body-class-empty': 'error',
             'marcrock/numeric-separators': 'error',
-            'marcrock/prefer-at': ['error', {
-                checkAllIndexAccess: true,
-            },],
         },
     }
 );
