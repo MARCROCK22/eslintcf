@@ -51,6 +51,12 @@ export default defineConfig({
         '@typescript-eslint/consistent-generic-constructors': 'error',
         'no-array-constructor': 'off',
         '@typescript-eslint/no-array-constructor': 'error',
+        'no-unassigned-vars': 'error',
+        'preserve-caught-error': 'error',
+        '@typescript-eslint/no-misused-spread': 'error',
+        '@typescript-eslint/no-unnecessary-type-conversion': 'error',
+        '@typescript-eslint/no-useless-default-assignment': 'error',
+        '@typescript-eslint/no-unused-private-class-members': 'error',
         '@typescript-eslint/consistent-type-imports': ['error', {
                 fixStyle: 'separate-type-imports',
                 disallowTypeAnnotations: false,
@@ -259,7 +265,7 @@ export default defineConfig({
         'no-unsafe-negation': 'error',
         'no-unsafe-optional-chaining': 'error',
         'no-unused-labels': 'error',
-        'no-unused-private-class-members': 'error',
+        'no-unused-private-class-members': 'off',
         'no-useless-backreference': 'error',
         'no-useless-call': 'error',
         'no-useless-catch': 'error',
@@ -305,6 +311,14 @@ export default defineConfig({
         'perfectionist/sort-decorators': 'off',
         'perfectionist/sort-enums': 'off',
         'perfectionist/sort-exports': ['error', {
+                type: 'line-length',
+                order: 'desc',
+            },],
+        'perfectionist/sort-export-attributes': ['error', {
+                type: 'line-length',
+                order: 'desc',
+            },],
+        'perfectionist/sort-import-attributes': ['error', {
                 type: 'line-length',
                 order: 'desc',
             },],
@@ -410,6 +424,8 @@ export default defineConfig({
         '@stylistic/type-generic-spacing': 'error',
         '@stylistic/type-named-tuple-spacing': 'error',
         '@stylistic/yield-star-spacing': 'error',
+        '@stylistic/exp-list-style': 'error',
+        '@stylistic/exp-jsx-props-style': 'error',
     },
 }, {
     plugins: {
