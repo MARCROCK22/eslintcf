@@ -3,9 +3,9 @@ export default function create(createRule) {
     return createRule({
         create(context, options) {
             // @ts-expect-error
-            const regex = options[0].match instanceof RegExp
+            const regex = options.at(0).match instanceof RegExp
                 // @ts-expect-error
-                ? options[0].match
+                ? options.at(0).match
                 : undefined;
             if (regex) {
                 return {

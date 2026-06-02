@@ -6,9 +6,9 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
     return createRule({
         create(context, options) {
             // @ts-expect-error
-            const regex: undefined | RegExp = options[0].match instanceof RegExp
+            const regex: undefined | RegExp = options.at(0).match instanceof RegExp
                 // @ts-expect-error
-                ? options[0].match
+                ? options.at(0).match
                 : undefined;
             if (regex) {
                 return {
