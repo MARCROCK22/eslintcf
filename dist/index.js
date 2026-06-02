@@ -427,11 +427,6 @@ export default defineConfig({
     plugins: {
         unicorn,
     },
-    rules: {
-        'unicorn/prefer-at': ['error', {
-                checkAllIndexAccess: true,
-            },],
-    },
 }, {
     plugins: {
         marcrock: rules,
