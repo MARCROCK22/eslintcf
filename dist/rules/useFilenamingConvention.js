@@ -1,4 +1,4 @@
-import path from 'path';
+import path from 'node:path';
 export default function create(createRule) {
     return createRule({
         create(context, options) {

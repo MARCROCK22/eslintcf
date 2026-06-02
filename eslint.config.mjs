@@ -3,6 +3,7 @@ import theConfig from "./dist/index.js";
 
 export default defineConfig(
     theConfig,
+    { ignores: ['src/rules/__test__/'] },
     {
         languageOptions: {
             parserOptions: {

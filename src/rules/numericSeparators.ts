@@ -50,5 +50,5 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
 }
 
 function parseNumber(str: string) {
-    return str.replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, '_');
+    return str.replaceAll(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, '_');
 }

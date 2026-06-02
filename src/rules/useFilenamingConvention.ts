@@ -1,6 +1,6 @@
 import type { ESLintUtils, } from '@typescript-eslint/utils';
 
-import path from 'path';
+import path from 'node:path';
 
 export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCreator>) {
     return createRule({

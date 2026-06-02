@@ -42,5 +42,5 @@ export default function create(createRule) {
     });
 }
 function parseNumber(str) {
-    return str.replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, '_');
+    return str.replaceAll(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, '_');
 }

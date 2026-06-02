@@ -15,8 +15,8 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                             node,
                             fix(fixer) {
                                 return fixer.removeRange([
-                                    x + 2,
-y - 1,
+                                    x + 1,
+                                    y - 1,
                                 ]);
                             },
                         });

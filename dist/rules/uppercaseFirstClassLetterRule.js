@@ -3,13 +3,11 @@ export default function create(createRule) {
         create(context) {
             return {
                 ClassDeclaration(node) {
-                    if (node.id !== null) {
-                        if (/^[a-z]/.test(node.id.name)) {
-                            context.report({
-                                messageId: 'uppercaseFirstClassLeter',
-                                node: node.id,
-                            });
-                        }
+                    if (node.id !== null && /^[a-z]/.test(node.id.name)) {
+                        context.report({
+                            messageId: 'uppercaseFirstClassLeter',
+                            node: node.id,
+                        });
                     }
                 },
             };

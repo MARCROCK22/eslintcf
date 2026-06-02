@@ -13,7 +13,7 @@ export default function create(createRule) {
                             node,
                             fix(fixer) {
                                 return fixer.removeRange([
-                                    x + 2,
+                                    x + 1,
                                     y - 1,
                                 ]);
                             },

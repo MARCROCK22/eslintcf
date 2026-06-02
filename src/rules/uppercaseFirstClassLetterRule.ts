@@ -5,14 +5,12 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
         create(context) {
             return {
                 ClassDeclaration(node) {
-                    if (node.id !== null) {
-                        if (/^[a-z]/.test(node.id.name)) {
+                    if (node.id !== null && /^[a-z]/.test(node.id.name)) {
                             context.report({
                                 messageId: 'uppercaseFirstClassLeter',
                                 node: node.id,
                             });
                         }
-                    }
                 },
             };
         },
