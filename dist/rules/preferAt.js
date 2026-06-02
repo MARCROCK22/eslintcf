@@ -151,7 +151,7 @@ export default function create(createRule) {
                     yield fixer.replaceText(callee.property, 'at');
                     // Remove extra arguments
                     if (sliceCall.arguments.length !== 1) {
-                        const [, start,] = getParenthesizedRange(sliceCall.arguments[0], context);
+                        const [, start,] = getParenthesizedRange(sliceCall.arguments.at(0), context);
                         const [end,] = sourceCode.getLastToken(sliceCall).range;
                         yield fixer.removeRange([start, end,]);
                     }
@@ -319,8 +319,8 @@ export default function create(createRule) {
                                 const tokenBefore = sourceCode.getTokenBefore(numberNode);
                                 if (tokenBefore?.type === 'Punctuator'
                                     && tokenBefore.value === '-'
-                                    && /^\s+$/.test(sourceCode.text.slice(tokenBefore.range[1], numberNode.range[0]))) {
-                                    yield fixer.removeRange([tokenBefore.range[1], numberNode.range[0],]);
+                                    && /^\s+$/.test(sourceCode.text.slice(tokenBefore.range.at(1), numberNode.range.at(0)))) {
+                                    yield fixer.removeRange([tokenBefore.range.at(1), numberNode.range.at(0),]);
                                 }
                             }
                             const isOptional = node.optional;

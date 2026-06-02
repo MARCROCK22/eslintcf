@@ -1,4 +1,4 @@
-/* eslint-disable marcrock/prefer-at, @typescript-eslint/no-unnecessary-condition, no-cond-assign -- AST-traversal helpers vendored/forked from eslint-plugin-unicorn: bracket index access into AST tuples is intentional (`.at()` would widen to `T | undefined` and break `tsc`), the defensive conditionals are faithful to unicorn's originals, and the `while (parentheses = …)` walk is a direct port of unicorn's iterate-surrounding-parentheses. */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition, no-cond-assign -- AST-traversal helpers vendored/forked from eslint-plugin-unicorn: bracket index access into AST tuples is intentional (`.at()` would widen to `T | undefined` and break `tsc`), the defensive conditionals are faithful to unicorn's originals, and the `while (parentheses = …)` walk is a direct port of unicorn's iterate-surrounding-parentheses. */
 /*
 Vendored helpers for the forked `prefer-at` rule.
 
@@ -494,7 +494,7 @@ function isNewExpressionWithParentheses(node, context) {
     // The expression should end with its own parens, for example, `new new Foo()` is not a new expression with parens.
     return isOpeningParenToken(penultimateToken)
         && isClosingParenToken(lastToken)
-        && getRange(node.callee)[1] < getRange(node)[1];
+        && getRange(node.callee).at(1) < getRange(node).at(1);
 }
 // --- utils/should-add-parentheses-to-member-expression-object.js -------------
 export function shouldAddParenthesesToMemberExpressionObject(node, context) {
@@ -547,7 +547,7 @@ const charactersMightNeedsSemicolon = new Set([
 ]);
 export function needsSemicolon(tokenBefore, context, code) {
     if (code === ''
-        || code && !charactersMightNeedsSemicolon.has(code.charAt(0))) {
+        || code && !charactersMightNeedsSemicolon.has(code.at(0))) {
         return false;
     }
     if (!tokenBefore) {
@@ -557,7 +557,7 @@ export function needsSemicolon(tokenBefore, context, code) {
     const { type, value, } = tokenBefore;
     const range = getRange(tokenBefore);
     // The token always sits inside a node, so a containing node is guaranteed.
-    const lastBlockNode = sourceCode.getNodeByRangeIndex(range[0]);
+    const lastBlockNode = sourceCode.getNodeByRangeIndex(range.at(0));
     if (type === 'Punctuator') {
         if (value === ';') {
             return false;

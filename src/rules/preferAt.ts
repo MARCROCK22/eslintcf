@@ -1,4 +1,4 @@
-/* eslint-disable marcrock/prefer-at, @typescript-eslint/no-unnecessary-condition -- AST-traversal code forked from eslint-plugin-unicorn: bracket index access into AST tuples/arguments is intentional (`.at()` would widen to `T | undefined` and break `tsc`), and the defensive type-guard conditionals are faithful to unicorn's originals. */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- AST-traversal code forked from eslint-plugin-unicorn: bracket index access into AST tuples/arguments is intentional (`.at()` would widen to `T | undefined` and break `tsc`), and the defensive type-guard conditionals are faithful to unicorn's originals. */
 import type { TSESLint, TSESTree, } from '@typescript-eslint/utils';
 
 import { ESLintUtils, ASTUtils, } from '@typescript-eslint/utils';
@@ -216,7 +216,7 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
 
                     // Remove extra arguments
                     if (sliceCall.arguments.length !== 1) {
-                        const [, start,] = getParenthesizedRange(sliceCall.arguments[0], context);
+                        const [, start,] = getParenthesizedRange(sliceCall.arguments.at(0)!, context);
                         const [end,] = (sourceCode.getLastToken(sliceCall) as TSESTree.Token).range;
                         yield fixer.removeRange([start, end,]);
                     }
@@ -412,9 +412,9 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                                 if (
                                     tokenBefore?.type === 'Punctuator'
                                     && tokenBefore.value === '-'
-                                    && /^\s+$/.test(sourceCode.text.slice(tokenBefore.range[1], numberNode.range[0]))
+                                    && /^\s+$/.test(sourceCode.text.slice(tokenBefore.range.at(1), numberNode.range.at(0)))
                                 ) {
-                                    yield fixer.removeRange([tokenBefore.range[1], numberNode.range[0],]);
+                                    yield fixer.removeRange([tokenBefore.range.at(1)!, numberNode.range.at(0)!,]);
                                 }
                             }
 

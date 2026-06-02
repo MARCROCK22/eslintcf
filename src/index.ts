@@ -387,10 +387,6 @@ export default defineConfig(
             '@stylistic/function-call-argument-newline': ['error', 'consistent',],
             '@stylistic/function-call-spacing': 'error',
             '@stylistic/function-paren-newline': ['error', 'consistent',],
-            '@stylistic/generator-star-spacing': ['error', {
-                before: true,
-                after: false,
-            },],
             '@stylistic/implicit-arrow-linebreak': 'error',
             '@stylistic/key-spacing': 'error',
             '@stylistic/keyword-spacing': 'error',
