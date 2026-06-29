@@ -82,13 +82,14 @@ ruleTester.run('prefer-at', rule, {
         // index is not a literal `0` (a resolved const member could be mutated) → stays
         withCheckAll('const C = { i: 0 }; \'a.b\'.split(\'.\').at(C.i);'),
 
-        // --- NEW: type-aware tuple exemption (element provably present) -------
-        withCheckAll('declare const t: [string, number]; t[0];'),
-        withCheckAll('declare const t: [string, number]; t[1];'),
+        // --- NEW: type-aware tuple exemption — only READONLY tuples (a mutable
+        // tuple can be `pop()`-ed, or be an `as [...]` cast that lies) ---------
+        withCheckAll('declare const t: readonly [string, number]; t[0];'),
+        withCheckAll('declare const t: readonly [string, number]; t[1];'),
         withCheckAll('const t = [10, 20, 30] as const; t[2];'),
-        // last element via `[length - 1]` on a tuple (minLength >= 1)
-        'declare const t: [string, number]; t[t.length - 1];',
-        'declare const t: [string, number?]; t[t.length - 1];',
+        // last element via `[length - 1]` on a readonly tuple (minLength >= 1)
+        'declare const t: readonly [string, number]; t[t.length - 1];',
+        'declare const t: readonly [string, number?]; t[t.length - 1];',
 
         // --- NEW: control-flow length-guard exemption (early-exit guard) -----
         withCheckAll('function f(r: string[]) { if (!r.length) return; return r[0]; }'),
@@ -286,6 +287,42 @@ ruleTester.run('prefer-at', rule, {
             code: 'declare const t: [string?]; t[t.length - 1];',
             output: 'declare const t: [string?]; t.at(-1);',
             errors: [{ messageId: 'negativeIndex', },],
+        },
+        // --- NEW: soundness regressions — a MUTABLE tuple is NOT exempt (it can
+        // be `pop()`-ed, or be an `as [...]` cast that lies about a short array)
+        {
+            ...withCheckAll('declare const t: [string, number]; t[1];'),
+            output: 'declare const t: [string, number]; t.at(1);',
+            errors: [{ messageId: 'index', },],
+        },
+        {
+            code: 'declare const t: [string, number]; t[t.length - 1];',
+            output: 'declare const t: [string, number]; t.at(-1);',
+            errors: [{ messageId: 'negativeIndex', },],
+        },
+        // a const array MUTATED after the guard can be emptied → guard no longer
+        // holds → flagged (const blocks rebinding, not in-place mutation)
+        {
+            ...withCheckAll('function f() { const a = [\'x\']; if (!a.length) return \'\'; a.pop(); return a[0]; }'),
+            output: 'function f() { const a = [\'x\']; if (!a.length) return \'\'; a.pop(); return a.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        {
+            ...withCheckAll('function f() { const a = [\'x\']; if (!a.length) return \'\'; a.length = 0; return a[0]; }'),
+            output: 'function f() { const a = [\'x\']; if (!a.length) return \'\'; a.length = 0; return a.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // a const array that ESCAPES to a callee (which may mutate it) → flagged
+        {
+            ...withCheckAll('function f(clear: (x: string[]) => void) { const a = [\'x\']; if (!a.length) return \'\'; clear(a); return a[0]; }'),
+            output: 'function f(clear: (x: string[]) => void) { const a = [\'x\']; if (!a.length) return \'\'; clear(a); return a.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // a const array ALIASED, then the alias mutates it → flagged
+        {
+            ...withCheckAll('function f() { const a = [\'x\']; const b = a; if (!a.length) return \'\'; b.pop(); return a[0]; }'),
+            output: 'function f() { const a = [\'x\']; const b = a; if (!a.length) return \'\'; b.pop(); return a.at(0); }',
+            errors: [{ messageId: 'index', },],
         },
         // --- NEW: control-flow guard — false alarms that must STILL flag -----
         // access precedes the guard

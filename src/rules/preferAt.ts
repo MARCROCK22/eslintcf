@@ -168,7 +168,11 @@ function checkSliceCall(node: TSESTree.CallExpression): {
 
 // --- tuple soundness (type-aware index exemption) -----------------------------
 
-// The TupleType target of `type`, or null when `type` is not a tuple reference.
+// The READONLY TupleType target of `type`, or null otherwise. Only readonly tuples
+// are immutable: a mutable tuple can be `pop()`-ed (or be the result of an
+// `as [T, T]` cast that lies about a shorter runtime array), so its static length is
+// not a runtime guarantee. A readonly tuple (`as const` / `readonly [...]`) cannot be
+// mutated, so its element types are a real guarantee.
 function tupleTargetOf(type: ts.Type): ts.TupleType | null {
     if (!(type.flags & ts.TypeFlags.Object)) {
         return null;
@@ -180,7 +184,11 @@ function tupleTargetOf(type: ts.Type): ts.TupleType | null {
     if (!(target.objectFlags & ts.ObjectFlags.Tuple)) {
         return null;
     }
-    return target as ts.TupleType;
+    const tuple = target as ts.TupleType;
+    if (!tuple.readonly) {
+        return null;
+    }
+    return tuple;
 }
 
 // Guaranteed minimum element count when EVERY constituent of `type` is a tuple,
@@ -418,6 +426,41 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                     return false;
                 }
                 return variable.references.every((reference) => !reference.isWrite() || reference.init === true);
+            };
+
+            // For a MUTABLE array receiver, `isEffectivelyConst` is not enough: `const`
+            // blocks rebinding, not in-place mutation (`pop`/`shift`/`splice`/`length =`/
+            // `delete`/alias/escape). Require that EVERY reference is a non-write `V.length`
+            // or `V[index]` read — then it cannot be mutated, aliased, passed to a callee,
+            // reassigned, or deleted-from between the guard and the access.
+            const isNonEscapingArray = (idNode: TSESTree.Identifier): boolean => {
+                const variable = findVariable(sourceCode.getScope(idNode), idNode.name);
+                if (variable === null) {
+                    return false;
+                }
+                return variable.references.every((reference) => {
+                    if (reference.init === true) {
+                        return true;
+                    }
+                    const member = reference.identifier.parent;
+                    if (member.type !== 'MemberExpression' || member.object !== reference.identifier) {
+                        return false;
+                    }
+                    const outer = member.parent;
+                    if (outer.type === 'AssignmentExpression' && outer.left === member) {
+                        return false;
+                    }
+                    if (outer.type === 'UpdateExpression' && outer.argument === member) {
+                        return false;
+                    }
+                    if (outer.type === 'UnaryExpression' && outer.operator === 'delete' && outer.argument === member) {
+                        return false;
+                    }
+                    if (member.computed) {
+                        return true;
+                    }
+                    return member.property.type === 'Identifier' && member.property.name === 'length';
+                });
             };
 
             // The kind of dominating early-exit guard (a preceding sibling in the same
@@ -711,20 +754,26 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                         // Control-flow: `if (V too short / empty) <exit>; … V[k]` — a
                         // dominating early-exit guard proves index k is present, so `.at(k)`
                         // would only widen to `T | undefined`. The index must be a literal (a
-                        // resolved-const value could be mutated) and V an effectively-const
-                        // Identifier; the receiver type is checked per guard kind (a `.length`
-                        // guard needs array/string; a `!V` guard needs string).
+                        // resolved-const value could be mutated). A STRING receiver only needs
+                        // to be never-reassigned (immutable); an ARRAY receiver must also never
+                        // escape or mutate — `const` does not prevent `pop`/`splice`/`length =`/
+                        // aliasing/`delete` (see isNonEscapingArray).
                         if (indexNode.type === 'Literal'
                             && typeof indexNode.value === 'number'
                             && Number.isInteger(indexNode.value)
                             && indexNode.value >= 0
-                            && node.object.type === 'Identifier'
-                            && isEffectivelyConst(node.object)) {
+                            && node.object.type === 'Identifier') {
                             const guardKind = dominatingGuardKind(node, node.object.name, indexNode.value);
-                            if (guardKind === 'length' && isLengthIndexableObject(node.object)) {
+                            // String receiver: immutable, so never-reassigned is enough.
+                            if ((guardKind === 'string' || guardKind === 'length')
+                                && isStringObject(node.object)
+                                && isEffectivelyConst(node.object)) {
                                 return;
                             }
-                            if (guardKind === 'string' && isStringObject(node.object)) {
+                            // Array receiver: mutable, so it must never escape or mutate.
+                            if (guardKind === 'length'
+                                && isLengthIndexableObject(node.object)
+                                && isNonEscapingArray(node.object)) {
                                 return;
                             }
                         }
