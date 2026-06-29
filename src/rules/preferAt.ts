@@ -50,11 +50,13 @@ the type to `T | undefined` for nothing):
    empty). Degrades to no exemption when type info is unavailable.
 
 3. Control-flow: `V[k]` when a preceding early-exit guard in the same block proves
-   `V.length > k` — `if (!V.length) …` covers `k === 0`, `if (V.length < m) …`
-   covers `k <= m - 1`, `if (V.length <= n) …` covers `k <= n` (exit via
-   `return`/`throw`/`break`/`continue`). Requires `V` to be an effectively-const
-   array/string Identifier and a LITERAL index. A missing or insufficient guard, a
-   reassignable `V`, or a non-array/string receiver is still reported.
+   index k is present (exit via `return`/`throw`/`break`/`continue`): a length
+   guard `if (!V.length)` / `if (V.length < m)` / `if (V.length <= n)` (for an
+   array OR string), or — for a STRING only — a truthiness/empty guard `if (!V)` /
+   `if (V === '')` (covers `k === 0`; an empty array is truthy so this is unsound
+   for arrays). Requires `V` to be an effectively-const Identifier and a LITERAL
+   index. A missing/insufficient guard, a reassignable `V`, or a wrong receiver
+   type is still reported.
 
 None of these exemptions is applied to the `charAt`/`slice`/get-last paths.
 
@@ -220,18 +222,23 @@ function negativeIndexK(indexNode: TSESTree.Node, lengthNode: TSESTree.Node): nu
 
 // --- control-flow soundness (length-guard index exemption) --------------------
 
-// Whether reaching the access (the guard `test` was FALSE) proves
-// `<objectName>.length > k`, for an early-exit guard `if (test) <exit>`. Sound for:
-//   !V.length / V.length === 0 / 0 === V.length        -> length >= 1   -> k === 0
-//   V.length < m / m > V.length   (m positive integer) -> length >= m   -> k <= m - 1
-//   V.length <= n / n >= V.length (n non-negative int) -> length >= n+1 -> k <= n
-function guardCoversIndex(test: TSESTree.Node, objectName: string, k: number): boolean {
+// What an early-exit guard `if (test) <exit>` proves about reaching the access
+// (i.e. `test` was FALSE) for index `k`. Returns:
+//   'length' — proves `<objectName>.length > k` (valid for arrays AND strings):
+//       !V.length / V.length === 0 / 0 === V.length        -> length >= 1   -> k === 0
+//       V.length < m / m > V.length   (m positive integer) -> length >= m   -> k <= m - 1
+//       V.length <= n / n >= V.length (n non-negative int) -> length >= n+1 -> k <= n
+//   'string' — proves V is a non-empty STRING (valid ONLY for strings, since an
+//       empty array is truthy):  !V / V === '' / '' === V  ->  k === 0
+//   null — not a recognized sufficient guard.
+function guardCoversIndex(test: TSESTree.Node, objectName: string, k: number): 'length' | 'string' | null {
     const isLengthOf = (n: TSESTree.Node): boolean => n.type === 'MemberExpression'
         && !n.computed
         && n.object.type === 'Identifier'
         && n.object.name === objectName
         && n.property.type === 'Identifier'
         && n.property.name === 'length';
+    const isObject = (n: TSESTree.Node): boolean => n.type === 'Identifier' && n.name === objectName;
     const intValue = (n: TSESTree.Node): number | null => {
         if (n.type === 'Literal' && typeof n.value === 'number' && Number.isInteger(n.value) && n.value >= 0) {
             return n.value;
@@ -240,33 +247,62 @@ function guardCoversIndex(test: TSESTree.Node, objectName: string, k: number): b
     };
 
     if (test.type === 'UnaryExpression' && test.operator === '!') {
-        return isLengthOf(test.argument) && k === 0;
+        if (k !== 0) {
+            return null;
+        }
+        if (isLengthOf(test.argument)) {
+            return 'length';
+        }
+        if (isObject(test.argument)) {
+            return 'string';
+        }
+        return null;
     }
     if (test.type !== 'BinaryExpression') {
-        return false;
+        return null;
     }
     const { operator, left, right, } = test;
     if (operator === '===' || operator === '==') {
-        const isEmpty = isLengthOf(left) && isLiteral(right, 0) || isLiteral(left, 0) && isLengthOf(right);
-        return isEmpty && k === 0;
+        if (k !== 0) {
+            return null;
+        }
+        if (isLengthOf(left) && isLiteral(right, 0) || isLiteral(left, 0) && isLengthOf(right)) {
+            return 'length';
+        }
+        if (isObject(left) && isLiteral(right, '') || isLiteral(left, '') && isObject(right)) {
+            return 'string';
+        }
+        return null;
     }
     if (operator === '<' && isLengthOf(left)) {
         const m = intValue(right);
-        return m !== null && k <= m - 1;
+        if (m !== null && k <= m - 1) {
+            return 'length';
+        }
+        return null;
     }
     if (operator === '>' && isLengthOf(right)) {
         const m = intValue(left);
-        return m !== null && k <= m - 1;
+        if (m !== null && k <= m - 1) {
+            return 'length';
+        }
+        return null;
     }
     if (operator === '<=' && isLengthOf(left)) {
         const n = intValue(right);
-        return n !== null && k <= n;
+        if (n !== null && k <= n) {
+            return 'length';
+        }
+        return null;
     }
     if (operator === '>=' && isLengthOf(right)) {
         const n = intValue(left);
-        return n !== null && k <= n;
+        if (n !== null && k <= n) {
+            return 'length';
+        }
+        return null;
     }
-    return false;
+    return null;
 }
 
 // Whether `statement` definitely transfers control out (no fall-through).
@@ -357,6 +393,21 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                     || checker.isTupleType(part));
             };
 
+            // Whether every constituent of the object's type is a string (the `!V` /
+            // `V === ''` truthiness guard only proves non-empty for strings — an empty
+            // array is truthy).
+            const isStringObject = (objectNode: TSESTree.Node): boolean => {
+                const type = getNodeType(objectNode);
+                if (type === null) {
+                    return false;
+                }
+                let parts: readonly ts.Type[] = [type,];
+                if (type.isUnion()) {
+                    parts = type.types;
+                }
+                return parts.every((part) => (part.flags & ts.TypeFlags.StringLike) !== 0);
+            };
+
             // Whether `idNode` resolves to a variable that is never reassigned (only its
             // initializer writes it) — so a guarded non-emptiness still holds at the access.
             const isEffectivelyConst = (idNode: TSESTree.Identifier): boolean => {
@@ -367,10 +418,10 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                 return variable.references.filter((reference) => reference.isWrite()).length <= 1;
             };
 
-            // Whether a preceding sibling in the same block is an early-exit guard
-            // `if (test) <exit>` proving `<objectName>.length > k` — i.e. it dominates the
-            // access and guarantees index `k` is present.
-            const hasDominatingLengthGuard = (accessNode: TSESTree.Node, objectName: string, k: number): boolean => {
+            // The kind of dominating early-exit guard (a preceding sibling in the same
+            // block) that guarantees index `k` is present: `'length'` (array/string) or
+            // `'string'` (string only), or null if there is none.
+            const dominatingGuardKind = (accessNode: TSESTree.Node, objectName: string, k: number): 'length' | 'string' | null => {
                 let statement: TSESTree.Node = accessNode;
                 while (statement.parent !== undefined) {
                     const body = getStatementListBody(statement.parent);
@@ -380,17 +431,19 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                             const sibling = body[i];
                             if (sibling.type === 'IfStatement'
                                 && sibling.alternate === null
-                                && guardCoversIndex(sibling.test, objectName, k)
                                 && definitelyExits(sibling.consequent)) {
-                                return true;
+                                const kind = guardCoversIndex(sibling.test, objectName, k);
+                                if (kind !== null) {
+                                    return kind;
+                                }
                             }
                         }
                         // Same block only (a block cannot redeclare a const name → no shadowing).
-                        return false;
+                        return null;
                     }
                     statement = statement.parent;
                 }
-                return false;
+                return null;
             };
 
             // `<expr>.split('<non-empty>')[0]` — the first element is always present.
@@ -653,20 +706,25 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                                 return;
                             }
                         }
-                        // Control-flow: `if (V too short) <exit>; … V[k]` — an early-exit
-                        // length guard that proves `V.length > k` guarantees index k is
-                        // present, so `.at(k)` would only widen to `T | undefined`. The index
-                        // must be a literal (a resolved-const value could be mutated), and V an
-                        // effectively-const array/string.
+                        // Control-flow: `if (V too short / empty) <exit>; … V[k]` — a
+                        // dominating early-exit guard proves index k is present, so `.at(k)`
+                        // would only widen to `T | undefined`. The index must be a literal (a
+                        // resolved-const value could be mutated) and V an effectively-const
+                        // Identifier; the receiver type is checked per guard kind (a `.length`
+                        // guard needs array/string; a `!V` guard needs string).
                         if (indexNode.type === 'Literal'
                             && typeof indexNode.value === 'number'
                             && Number.isInteger(indexNode.value)
                             && indexNode.value >= 0
                             && node.object.type === 'Identifier'
-                            && hasDominatingLengthGuard(node, node.object.name, indexNode.value)
-                            && isEffectivelyConst(node.object)
-                            && isLengthIndexableObject(node.object)) {
-                            return;
+                            && isEffectivelyConst(node.object)) {
+                            const guardKind = dominatingGuardKind(node, node.object.name, indexNode.value);
+                            if (guardKind === 'length' && isLengthIndexableObject(node.object)) {
+                                return;
+                            }
+                            if (guardKind === 'string' && isStringObject(node.object)) {
+                                return;
+                            }
                         }
                     }
 

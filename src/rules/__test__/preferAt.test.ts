@@ -101,6 +101,15 @@ ruleTester.run('prefer-at', rule, {
         // generalized: a guard proving a larger length covers higher indices
         withCheckAll('function f(r: string[]) { if (r.length < 2) return; return r[1]; }'),
         withCheckAll('function f(r: string[]) { if (r.length <= 2) return; return r[2]; }'),
+        // string truthiness/empty guard (the capitalize.ts shape): `!str` / `str === ''`
+        withCheckAll('function f(str: string) { if (!str) return \'\'; return str[0]; }'),
+        withCheckAll('function f(str: string) { if (str === \'\') return \'\'; return str[0]; }'),
+        // a `.length` guard also covers strings, including higher indices
+        withCheckAll('function f(str: string) { if (str.length < 2) return \'\'; return str[1]; }'),
+        // reversed operands also work: `0 === V.length`, `m > V.length`, `n >= V.length`
+        withCheckAll('function f(r: string[]) { if (0 === r.length) return; return r[0]; }'),
+        withCheckAll('function f(r: string[]) { if (2 > r.length) return; return r[1]; }'),
+        withCheckAll('function f(r: string[]) { if (2 >= r.length) return; return r[2]; }'),
 
         // --- `String#charAt` -------------------------------------------------
         'string.charAt(string.length - 0);',
@@ -319,6 +328,49 @@ ruleTester.run('prefer-at', rule, {
         {
             ...withCheckAll('function f(r: string[]) { if (r.length < 2) return; return r[2]; }'),
             output: 'function f(r: string[]) { if (r.length < 2) return; return r.at(2); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // `!V` on an ARRAY does NOT prove non-empty (an empty array is truthy) → flagged
+        {
+            ...withCheckAll('function f(arr: string[]) { if (!arr) return; return arr[0]; }'),
+            output: 'function f(arr: string[]) { if (!arr) return; return arr.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // a string truthiness guard only covers index 0 → str[1] still flagged
+        {
+            ...withCheckAll('function f(str: string) { if (!str) return \'\'; return str[1]; }'),
+            output: 'function f(str: string) { if (!str) return \'\'; return str.at(1); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // WRONG-direction length guards do NOT prove non-empty → still flagged.
+        // `length > n` exits when LONG (after: length <= n, could be 0)
+        {
+            ...withCheckAll('function f(r: string[]) { if (r.length > 2) return; return r[0]; }'),
+            output: 'function f(r: string[]) { if (r.length > 2) return; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // `length >= 1` exits when non-empty (reaching the access means it IS empty)
+        {
+            ...withCheckAll('function f(r: string[]) { if (r.length >= 1) return; return r[0]; }'),
+            output: 'function f(r: string[]) { if (r.length >= 1) return; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // `length !== 0` exits when non-empty (backwards)
+        {
+            ...withCheckAll('function f(r: string[]) { if (r.length !== 0) return; return r[0]; }'),
+            output: 'function f(r: string[]) { if (r.length !== 0) return; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // `length === 5` (exact, non-zero) does not prove length > 0 after the exit
+        {
+            ...withCheckAll('function f(r: string[]) { if (r.length === 5) return; return r[0]; }'),
+            output: 'function f(r: string[]) { if (r.length === 5) return; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // a bare truthy early-exit `if (r.length) return` is backwards (after: empty)
+        {
+            ...withCheckAll('function f(r: string[]) { if (r.length) return; return r[0]; }'),
+            output: 'function f(r: string[]) { if (r.length) return; return r.at(0); }',
             errors: [{ messageId: 'index', },],
         },
         {
