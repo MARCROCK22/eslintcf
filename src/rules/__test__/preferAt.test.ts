@@ -3,8 +3,9 @@ Tests for the forked `prefer-at` rule (src/rules/preferAt.ts).
 
 Covers all four ported paths from eslint-plugin-unicorn's test/prefer-at.js
 (index access, `String#charAt`, `.slice(-n)[0]`/`.shift()`/`.pop()`, and
-get-last functions) PLUS the split-exemption cases (the customization:
-`x.split('<non-empty>')[0]` is allowed — the first element is always present).
+get-last functions) PLUS the two customizations: the split exemption
+(`x.split('<non-empty>')[0]`) and the type-aware tuple exemption
+(`<tuple>[k]` / `<tuple>[length - 1]` when the element is provably present).
 
 unicorn's own tests are snapshot-based; here they are adapted to
 `@typescript-eslint/rule-tester`'s explicit `errors`/`messageId` format. To run:
@@ -80,6 +81,14 @@ ruleTester.run('prefer-at', rule, {
         withCheckAll('[1, 2, 3,].at(0);'),
         // index is not a literal `0` (a resolved const member could be mutated) → stays
         withCheckAll('const C = { i: 0 }; \'a.b\'.split(\'.\').at(C.i);'),
+
+        // --- NEW: type-aware tuple exemption (element provably present) -------
+        withCheckAll('declare const t: [string, number]; t[0];'),
+        withCheckAll('declare const t: [string, number]; t[1];'),
+        withCheckAll('const t = [10, 20, 30] as const; t[2];'),
+        // last element via `[length - 1]` on a tuple (minLength >= 1)
+        'declare const t: [string, number]; t[t.length - 1];',
+        'declare const t: [string, number?]; t[t.length - 1];',
 
         // --- `String#charAt` -------------------------------------------------
         'string.charAt(string.length - 0);',
@@ -231,6 +240,31 @@ ruleTester.run('prefer-at', rule, {
             ...withCheckAll('(\'a.b\'.split(\'.\')).at(0)'),
             output: '(\'a.b\'.split(\'.\'))[0]',
             errors: [{ messageId: 'splitIndexAccess', },],
+        },
+        // --- NEW: type-aware — NOT exempt (element not provably present) ------
+        // optional element beyond the required prefix
+        {
+            ...withCheckAll('declare const t: [string, number?]; t[1];'),
+            output: 'declare const t: [string, number?]; t.at(1);',
+            errors: [{ messageId: 'index', },],
+        },
+        // rest element index is not guaranteed
+        {
+            ...withCheckAll('declare const t: [string, ...number[]]; t[1];'),
+            output: 'declare const t: [string, ...number[]]; t.at(1);',
+            errors: [{ messageId: 'index', },],
+        },
+        // a plain `T[]` (not a tuple) via `[length - 1]` could be empty → flagged
+        {
+            code: 'declare const a: number[]; a[a.length - 1];',
+            output: 'declare const a: number[]; a.at(-1);',
+            errors: [{ messageId: 'negativeIndex', },],
+        },
+        // an all-optional tuple could be empty → `[length - 1]` still flagged
+        {
+            code: 'declare const t: [string?]; t[t.length - 1];',
+            output: 'declare const t: [string?]; t.at(-1);',
+            errors: [{ messageId: 'negativeIndex', },],
         },
 
         // --- `String#charAt` -------------------------------------------------

@@ -1,4 +1,5 @@
-import { ASTUtils, } from '@typescript-eslint/utils';
+import { ESLintUtils, ASTUtils, } from '@typescript-eslint/utils';
+import * as ts from 'typescript';
 const { isOpeningBracketToken, isClosingBracketToken, getStaticValue, } = ASTUtils;
 import { shouldAddParenthesesToMemberExpressionObject, removeMemberExpressionProperty, getNegativeIndexLengthNode, isNodeMatchesNameOrPath, getParenthesizedRange, getParenthesizedText, isMemberExpression, removeLengthNode, isCallExpression, removeMethodCall, isParenthesized, isLeftHandSide, needsSemicolon, isMethodCall, isLiteral, } from './preferAt/helpers.js';
 /*
@@ -7,14 +8,21 @@ port of all four detection paths (index access, `String#charAt`, the first
 element of `.slice(-n)` / `.shift()` / `.pop()`, and get-last functions such as
 `_.last`) WITH autofix and suggestions, faithful to unicorn.
 
-Difference vs unicorn (the one customization): in the INDEX-ACCESS path only,
-`<expr>.split('<non-empty>')[0]` is NOT reported, because `String#split` with a
-non-empty separator always yields a non-empty array — the first element is
-always present, so `.at(0)` would only widen the type to `string | undefined`.
-The separator is resolved statically, so named constants count (not just magic
-strings); an empty or dynamic separator, a `limit` argument, or any index other
-than `0` is still reported. This exemption is NOT applied to the
-`charAt`/`slice`/get-last paths.
+Differences vs unicorn (the customizations), both in the INDEX-ACCESS path only,
+exempting access whose element is PROVABLY present (so `.at()` would only widen
+the type to `T | undefined` for nothing):
+
+1. `<expr>.split('<non-empty>')[0]` — split with a non-empty separator (resolved
+   statically, so named constants count) always yields a non-empty array. Empty/
+   dynamic separators, a `limit` argument, or any index other than `0` are still
+   reported.
+
+2. Type-aware (reads the TS type): `<tuple>[k]` and `<tuple>[<tuple>.length - k]`
+   when the receiver is a fixed-length TUPLE whose element is guaranteed to exist
+   (`k < minLength` / `minLength >= k`). A plain `T[]` is NOT exempt (it can be
+   empty). Degrades to no exemption when type info is unavailable.
+
+Neither exemption is applied to the `charAt`/`slice`/get-last paths.
 
 Helpers live in `./preferAt/helpers.ts`, vendored from unicorn internals because
 unicorn's package `exports` blocks deep subpath imports.
@@ -96,6 +104,56 @@ function checkSliceCall(node) {
         firstElementGetMethod,
     };
 }
+// --- tuple soundness (type-aware index exemption) -----------------------------
+// The TupleType target of `type`, or null when `type` is not a tuple reference.
+function tupleTargetOf(type) {
+    if (!(type.flags & ts.TypeFlags.Object)) {
+        return null;
+    }
+    if (!(type.objectFlags & ts.ObjectFlags.Reference)) {
+        return null;
+    }
+    const { target, } = type;
+    if (!(target.objectFlags & ts.ObjectFlags.Tuple)) {
+        return null;
+    }
+    return target;
+}
+// Guaranteed minimum element count when EVERY constituent of `type` is a tuple,
+// else null (for a union the guarantee is the smallest minLength). `minLength` is
+// the count of leading required elements, so index `k` is always present iff
+// `k < tupleMinLength`, and `<obj>[<obj>.length - k]` iff `tupleMinLength >= k`.
+function tupleMinLength(type) {
+    let constituents = [type,];
+    if (type.isUnion()) {
+        constituents = type.types;
+    }
+    let min = Number.POSITIVE_INFINITY;
+    for (const constituent of constituents) {
+        const target = tupleTargetOf(constituent);
+        if (target === null) {
+            return null;
+        }
+        min = Math.min(min, target.minLength);
+    }
+    if (!Number.isFinite(min)) {
+        return null;
+    }
+    return min;
+}
+// `k` from the `<obj>.length - k` negative-index pattern (positive integer), else null.
+function negativeIndexK(indexNode, lengthNode) {
+    if (indexNode.type === 'BinaryExpression'
+        && indexNode.operator === '-'
+        && indexNode.left === lengthNode
+        && indexNode.right.type === 'Literal'
+        && typeof indexNode.right.value === 'number'
+        && Number.isInteger(indexNode.right.value)
+        && indexNode.right.value >= 1) {
+        return indexNode.right.value;
+    }
+    return null;
+}
 const lodashLastFunctions = [
     '_.last',
     'lodash.last',
@@ -109,6 +167,20 @@ export default function create(createRule) {
             const getLastElementFunctions = options.getLastElementFunctions ?? [];
             const getLastFunctions = [...getLastElementFunctions, ...lodashLastFunctions,];
             const { sourceCode, } = context;
+            // Static type of a node, or null when type info is unavailable (the rule
+            // still works as a plain syntactic rule without a program).
+            const getNodeType = (node) => {
+                try {
+                    const services = ESLintUtils.getParserServices(context, true);
+                    if (!services.program) {
+                        return null;
+                    }
+                    return services.getTypeAtLocation(node);
+                }
+                catch {
+                    return null;
+                }
+            };
             // `<expr>.split('<non-empty>')[0]` — the first element is always present.
             // Separator resolved statically so named constants count, not just magic
             // strings; requires exactly one argument (no `limit`) and a non-empty string.
@@ -302,7 +374,21 @@ export default function create(createRule) {
                     }
                     const indexNode = node.property;
                     const lengthNode = getNegativeIndexLengthNode(indexNode, node.object);
-                    if (!lengthNode) {
+                    if (lengthNode) {
+                        // Type-aware: `<tuple>[<tuple>.length - k]` indexes a present element
+                        // when the tuple's guaranteed length is >= k (so `length - k >= 0`).
+                        const k = negativeIndexK(indexNode, lengthNode);
+                        if (k !== null) {
+                            const objectType = getNodeType(node.object);
+                            if (objectType !== null) {
+                                const minLength = tupleMinLength(objectType);
+                                if (minLength !== null && minLength >= k) {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    else {
                         if (!checkAllIndexAccess) {
                             return;
                         }
@@ -316,6 +402,16 @@ export default function create(createRule) {
                         // Literal `0` only — a resolved-to-0 expression may be a mutated const.
                         if (isLiteral(indexNode, 0) && isFirstSplitElementAlwaysPresent(node.object)) {
                             return;
+                        }
+                        // Type-aware: `<tuple>[k]` is always present when `k` is within the
+                        // tuple's required elements, so `.at(k)` would only widen to `T | undefined`.
+                        // A plain `T[]` is NOT exempt (it can be empty).
+                        const objectType = getNodeType(node.object);
+                        if (objectType !== null) {
+                            const minLength = tupleMinLength(objectType);
+                            if (minLength !== null && staticValue.value < minLength) {
+                                return;
+                            }
                         }
                     }
                     // Faithful to unicorn: `arguments[arguments.length - 1]` is reported
@@ -384,7 +480,7 @@ export default function create(createRule) {
         meta: {
             type: 'suggestion',
             docs: {
-                description: 'Prefer `.at(…)` method for index access and `String#charAt()`, but allow `split(non-empty)[0]` (first element always present).',
+                description: 'Prefer `.at(…)` for index access and `String#charAt()`, but allow provably-present index access — `split(non-empty)[0]` and fixed-tuple `[k]` — where `.at()` would only add `| undefined`.',
             },
             fixable: 'code',
             hasSuggestions: true,
