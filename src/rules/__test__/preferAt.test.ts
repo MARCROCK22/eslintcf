@@ -90,6 +90,18 @@ ruleTester.run('prefer-at', rule, {
         'declare const t: [string, number]; t[t.length - 1];',
         'declare const t: [string, number?]; t[t.length - 1];',
 
+        // --- NEW: control-flow length-guard exemption (early-exit guard) -----
+        withCheckAll('function f(r: string[]) { if (!r.length) return; return r[0]; }'),
+        withCheckAll('function f(r: string[]) { if (r.length === 0) return; return r[0]; }'),
+        withCheckAll('function f(r: string[]) { if (r.length < 1) throw new Error(); return r[0]; }'),
+        // strings are length-indexable too
+        withCheckAll('function f(s: string) { if (!s.length) return; return s[0]; }'),
+        // guard with a block consequent (the getEmoji.ts shape)
+        withCheckAll('function f() { const r = \'a.b\'.split(\'.\'); if (!r.length) { return; } return r[0]; }'),
+        // generalized: a guard proving a larger length covers higher indices
+        withCheckAll('function f(r: string[]) { if (r.length < 2) return; return r[1]; }'),
+        withCheckAll('function f(r: string[]) { if (r.length <= 2) return; return r[2]; }'),
+
         // --- `String#charAt` -------------------------------------------------
         'string.charAt(string.length - 0);',
         'string.charAt(string.length + 1)',
@@ -266,8 +278,49 @@ ruleTester.run('prefer-at', rule, {
             output: 'declare const t: [string?]; t.at(-1);',
             errors: [{ messageId: 'negativeIndex', },],
         },
-
-        // --- `String#charAt` -------------------------------------------------
+        // --- NEW: control-flow guard — false alarms that must STILL flag -----
+        // access precedes the guard
+        {
+            ...withCheckAll('function f(r: string[]) { const x = r[0]; if (!r.length) return; return x; }'),
+            output: 'function f(r: string[]) { const x = r.at(0); if (!r.length) return; return x; }',
+            errors: [{ messageId: 'index', },],
+        },
+        // guard does not exit (falls through)
+        {
+            ...withCheckAll('function f(r: string[]) { if (!r.length) { } return r[0]; }'),
+            output: 'function f(r: string[]) { if (!r.length) { } return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // guard checks a DIFFERENT variable
+        {
+            ...withCheckAll('function f(r: string[], o: string[]) { if (!o.length) return; return r[0]; }'),
+            output: 'function f(r: string[], o: string[]) { if (!o.length) return; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // only index 0 is guarded by `!r.length`
+        {
+            ...withCheckAll('function f(r: string[]) { if (!r.length) return; return r[1]; }'),
+            output: 'function f(r: string[]) { if (!r.length) return; return r.at(1); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // receiver is reassigned after the guard (not effectively const)
+        {
+            ...withCheckAll('function f() { let r = [\'a\']; if (!r.length) return; r = []; return r[0]; }'),
+            output: 'function f() { let r = [\'a\']; if (!r.length) return; r = []; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // receiver has `.length` but is not an array/string (index-signature object)
+        {
+            ...withCheckAll('function f(r: { length: number;[k: number]: string }) { if (!r.length) return; return r[0]; }'),
+            output: 'function f(r: { length: number;[k: number]: string }) { if (!r.length) return; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // guard proves length >= 2, but index 2 needs length >= 3 → still flagged
+        {
+            ...withCheckAll('function f(r: string[]) { if (r.length < 2) return; return r[2]; }'),
+            output: 'function f(r: string[]) { if (r.length < 2) return; return r.at(2); }',
+            errors: [{ messageId: 'index', },],
+        },
         {
             code: 'string.charAt(string.length - 1);',
             output: null,

@@ -1,6 +1,6 @@
 import { ESLintUtils, ASTUtils, } from '@typescript-eslint/utils';
 import * as ts from 'typescript';
-const { isOpeningBracketToken, isClosingBracketToken, getStaticValue, } = ASTUtils;
+const { isOpeningBracketToken, isClosingBracketToken, getStaticValue, findVariable, } = ASTUtils;
 import { shouldAddParenthesesToMemberExpressionObject, removeMemberExpressionProperty, getNegativeIndexLengthNode, isNodeMatchesNameOrPath, getParenthesizedRange, getParenthesizedText, isMemberExpression, removeLengthNode, isCallExpression, removeMethodCall, isParenthesized, isLeftHandSide, needsSemicolon, isMethodCall, isLiteral, } from './preferAt/helpers.js';
 /*
 Forked from eslint-plugin-unicorn `prefer-at` (rules/prefer-at.js) — a complete
@@ -22,7 +22,14 @@ the type to `T | undefined` for nothing):
    (`k < minLength` / `minLength >= k`). A plain `T[]` is NOT exempt (it can be
    empty). Degrades to no exemption when type info is unavailable.
 
-Neither exemption is applied to the `charAt`/`slice`/get-last paths.
+3. Control-flow: `V[k]` when a preceding early-exit guard in the same block proves
+   `V.length > k` — `if (!V.length) …` covers `k === 0`, `if (V.length < m) …`
+   covers `k <= m - 1`, `if (V.length <= n) …` covers `k <= n` (exit via
+   `return`/`throw`/`break`/`continue`). Requires `V` to be an effectively-const
+   array/string Identifier and a LITERAL index. A missing or insufficient guard, a
+   reassignable `V`, or a non-array/string receiver is still reported.
+
+None of these exemptions is applied to the `charAt`/`slice`/get-last paths.
 
 Helpers live in `./preferAt/helpers.ts`, vendored from unicorn internals because
 unicorn's package `exports` blocks deep subpath imports.
@@ -154,6 +161,78 @@ function negativeIndexK(indexNode, lengthNode) {
     }
     return null;
 }
+// --- control-flow soundness (length-guard index exemption) --------------------
+// Whether reaching the access (the guard `test` was FALSE) proves
+// `<objectName>.length > k`, for an early-exit guard `if (test) <exit>`. Sound for:
+//   !V.length / V.length === 0 / 0 === V.length        -> length >= 1   -> k === 0
+//   V.length < m / m > V.length   (m positive integer) -> length >= m   -> k <= m - 1
+//   V.length <= n / n >= V.length (n non-negative int) -> length >= n+1 -> k <= n
+function guardCoversIndex(test, objectName, k) {
+    const isLengthOf = (n) => n.type === 'MemberExpression'
+        && !n.computed
+        && n.object.type === 'Identifier'
+        && n.object.name === objectName
+        && n.property.type === 'Identifier'
+        && n.property.name === 'length';
+    const intValue = (n) => {
+        if (n.type === 'Literal' && typeof n.value === 'number' && Number.isInteger(n.value) && n.value >= 0) {
+            return n.value;
+        }
+        return null;
+    };
+    if (test.type === 'UnaryExpression' && test.operator === '!') {
+        return isLengthOf(test.argument) && k === 0;
+    }
+    if (test.type !== 'BinaryExpression') {
+        return false;
+    }
+    const { operator, left, right, } = test;
+    if (operator === '===' || operator === '==') {
+        const isEmpty = isLengthOf(left) && isLiteral(right, 0) || isLiteral(left, 0) && isLengthOf(right);
+        return isEmpty && k === 0;
+    }
+    if (operator === '<' && isLengthOf(left)) {
+        const m = intValue(right);
+        return m !== null && k <= m - 1;
+    }
+    if (operator === '>' && isLengthOf(right)) {
+        const m = intValue(left);
+        return m !== null && k <= m - 1;
+    }
+    if (operator === '<=' && isLengthOf(left)) {
+        const n = intValue(right);
+        return n !== null && k <= n;
+    }
+    if (operator === '>=' && isLengthOf(right)) {
+        const n = intValue(left);
+        return n !== null && k <= n;
+    }
+    return false;
+}
+// Whether `statement` definitely transfers control out (no fall-through).
+function definitelyExits(statement) {
+    if (statement.type === 'ReturnStatement'
+        || statement.type === 'ThrowStatement'
+        || statement.type === 'BreakStatement'
+        || statement.type === 'ContinueStatement') {
+        return true;
+    }
+    if (statement.type === 'BlockStatement') {
+        const last = statement.body.at(-1);
+        return last !== undefined && definitelyExits(last);
+    }
+    return false;
+}
+// The statement-list a node holds (block / program / static block / switch case), else null.
+function getStatementListBody(node) {
+    if (node.type === 'BlockStatement' || node.type === 'StaticBlock' || node.type === 'Program') {
+        return node.body;
+    }
+    if (node.type === 'SwitchCase') {
+        return node.consequent;
+    }
+    return null;
+}
 const lodashLastFunctions = [
     '_.last',
     'lodash.last',
@@ -167,19 +246,79 @@ export default function create(createRule) {
             const getLastElementFunctions = options.getLastElementFunctions ?? [];
             const getLastFunctions = [...getLastElementFunctions, ...lodashLastFunctions,];
             const { sourceCode, } = context;
-            // Static type of a node, or null when type info is unavailable (the rule
-            // still works as a plain syntactic rule without a program).
-            const getNodeType = (node) => {
+            // Parser services with type info, or null when unavailable (the rule still
+            // works as a plain syntactic rule without a program).
+            const getServices = () => {
                 try {
                     const services = ESLintUtils.getParserServices(context, true);
                     if (!services.program) {
                         return null;
                     }
-                    return services.getTypeAtLocation(node);
+                    return services;
                 }
                 catch {
                     return null;
                 }
+            };
+            // Static type of a node, or null when type info is unavailable.
+            const getNodeType = (node) => {
+                const services = getServices();
+                if (services === null) {
+                    return null;
+                }
+                return services.getTypeAtLocation(node);
+            };
+            // Whether every constituent of the object's type is an array, tuple, or
+            // string — so `length > 0` truly implies index `0` exists (excludes e.g. a
+            // function or a `{ length: number }` object that is not really indexable).
+            const isLengthIndexableObject = (objectNode) => {
+                const services = getServices();
+                if (services === null) {
+                    return false;
+                }
+                const checker = services.program.getTypeChecker();
+                const type = services.getTypeAtLocation(objectNode);
+                let parts = [type,];
+                if (type.isUnion()) {
+                    parts = type.types;
+                }
+                return parts.every((part) => (part.flags & ts.TypeFlags.StringLike) !== 0
+                    || checker.isArrayType(part)
+                    || checker.isTupleType(part));
+            };
+            // Whether `idNode` resolves to a variable that is never reassigned (only its
+            // initializer writes it) — so a guarded non-emptiness still holds at the access.
+            const isEffectivelyConst = (idNode) => {
+                const variable = findVariable(sourceCode.getScope(idNode), idNode.name);
+                if (variable === null) {
+                    return false;
+                }
+                return variable.references.filter((reference) => reference.isWrite()).length <= 1;
+            };
+            // Whether a preceding sibling in the same block is an early-exit guard
+            // `if (test) <exit>` proving `<objectName>.length > k` — i.e. it dominates the
+            // access and guarantees index `k` is present.
+            const hasDominatingLengthGuard = (accessNode, objectName, k) => {
+                let statement = accessNode;
+                while (statement.parent !== undefined) {
+                    const body = getStatementListBody(statement.parent);
+                    if (body !== null) {
+                        const index = body.indexOf(statement);
+                        for (let i = 0; i < index; i++) {
+                            const sibling = body[i];
+                            if (sibling.type === 'IfStatement'
+                                && sibling.alternate === null
+                                && guardCoversIndex(sibling.test, objectName, k)
+                                && definitelyExits(sibling.consequent)) {
+                                return true;
+                            }
+                        }
+                        // Same block only (a block cannot redeclare a const name → no shadowing).
+                        return false;
+                    }
+                    statement = statement.parent;
+                }
+                return false;
             };
             // `<expr>.split('<non-empty>')[0]` — the first element is always present.
             // Separator resolved statically so named constants count, not just magic
@@ -412,6 +551,21 @@ export default function create(createRule) {
                             if (minLength !== null && staticValue.value < minLength) {
                                 return;
                             }
+                        }
+                        // Control-flow: `if (V too short) <exit>; … V[k]` — an early-exit
+                        // length guard that proves `V.length > k` guarantees index k is
+                        // present, so `.at(k)` would only widen to `T | undefined`. The index
+                        // must be a literal (a resolved-const value could be mutated), and V an
+                        // effectively-const array/string.
+                        if (indexNode.type === 'Literal'
+                            && typeof indexNode.value === 'number'
+                            && Number.isInteger(indexNode.value)
+                            && indexNode.value >= 0
+                            && node.object.type === 'Identifier'
+                            && hasDominatingLengthGuard(node, node.object.name, indexNode.value)
+                            && isEffectivelyConst(node.object)
+                            && isLengthIndexableObject(node.object)) {
+                            return;
                         }
                     }
                     // Faithful to unicorn: `arguments[arguments.length - 1]` is reported
