@@ -112,6 +112,39 @@ ruleTester.run('prefer-at', rule, {
         withCheckAll('function f(r: string[]) { if (2 > r.length) return; return r[1]; }'),
         withCheckAll('function f(r: string[]) { if (2 >= r.length) return; return r[2]; }'),
 
+        // --- NEW: generalized guard SHAPES — the access is DOMINATED by a proof ---
+        // positive `if` block (access nested in the then-branch)
+        withCheckAll('function f(a: string[]) { if (a.length) { return a[0]; } return \'\'; }'),
+        withCheckAll('function f(a: string[]) { if (a.length >= 2) { return a[1]; } return \'\'; }'),
+        withCheckAll('function f(s: string) { if (s.length > 0) { return s[0]; } return \'\'; }'),
+        // `else` branch (entered when the negative guard is false)
+        withCheckAll('function f(a: string[]) { if (!a.length) { return \'\'; } else { return a[0]; } }'),
+        // ternary
+        withCheckAll('function f(a: string[]) { return a.length ? a[0] : \'\'; }'),
+        withCheckAll('function f(s: string) { return s ? s[0] : \'\'; }'),
+        // logical `&&` (access is the directly-guarded operand)
+        withCheckAll('function f(a: string[]) { return (a.length && a[0]) || \'\'; }'),
+        // compound `||` early-exit (De Morgan: falling through ⇒ a non-empty)
+        withCheckAll('function f(a: string[], b: boolean) { if (!a.length || b) return \'\'; return a[0]; }'),
+        // guard one block shallower than the access (nested `if`)
+        withCheckAll('function f(a: string[], w: boolean) { if (a.length === 0) return \'\'; if (w) { return a[0]; } return \'\'; }'),
+        // a boolean flag derived from `.length`
+        withCheckAll('function f(a: string[]) { const has = a.length > 0; if (!has) return \'\'; return a[0]; }'),
+        // `switch (V.length)` — default reached only when length is none of the cases
+        withCheckAll('function f(a: string[]) { switch (a.length) { case 0: return \'\'; default: return a[0]; } }'),
+        // a const index that resolves to an integer
+        withCheckAll('function f(a: string[]) { const FIRST = 0; if (!a.length) return \'\'; return a[FIRST]; }'),
+
+        // --- NEW: statically-known length (no guard needed) ------------------
+        withCheckAll('const a = [1, 2]; a[0];'),
+        withCheckAll('const a = [1, 2, 3]; a[2];'),
+        withCheckAll('const s = \'ab\'; s[1];'),
+        withCheckAll('[10, 20, 30][1];'),
+        withCheckAll('\'A1\'[0];'),
+        // `.concat` with a literal contributes a guaranteed minimum length
+        withCheckAll('function f(a: number[]) { const all = [0].concat(a); return all[0]; }'),
+        withCheckAll('function f(a: number[]) { const all = a.concat(0); return all[all.length - 1]; }'),
+
         // --- `String#charAt` -------------------------------------------------
         'string.charAt(string.length - 0);',
         'string.charAt(string.length + 1)',
@@ -203,12 +236,7 @@ ruleTester.run('prefer-at', rule, {
             output: 'const offset = 5; array.at(offset + 9);',
             errors: [{ messageId: 'index', },],
         },
-        // arrays are NOT exempt (only strings are)
-        {
-            ...withCheckAll('const a = [1, 2]; a[0];'),
-            output: 'const a = [1, 2]; a.at(0);',
-            errors: [{ messageId: 'index', },],
-        },
+        // a plain `T[]` TYPE (no statically-known length, no guard) is NOT exempt
         {
             ...withCheckAll('declare const a: number[]; a[0];'),
             output: 'declare const a: number[]; a.at(0);',
@@ -421,6 +449,55 @@ ruleTester.run('prefer-at', rule, {
         {
             ...withCheckAll('function f(r: string[]) { if (r.length) return; return r[0]; }'),
             output: 'function f(r: string[]) { if (r.length) return; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // --- NEW: generalized guard — UNSOUND shapes that must STILL flag ----
+        // `||` short-circuit: `a[0]` runs when `a.length` is FALSY (empty) → undefined
+        {
+            ...withCheckAll('function f(a: number[]) { return (a.length || a[0]) || -1; }'),
+            output: 'function f(a: number[]) { return (a.length || a.at(0)) || -1; }',
+            errors: [{ messageId: 'index', },],
+        },
+        // ternary alternate: `a[0]` runs when the test is FALSY (empty)
+        {
+            ...withCheckAll('function f(a: number[]) { return a.length ? -1 : a[0]; }'),
+            output: 'function f(a: number[]) { return a.length ? -1 : a.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // positive guard, access in the `else` (entered only when EMPTY)
+        {
+            ...withCheckAll('function f(a: number[]) { if (a.length) { return -1; } else { return a[0]; } }'),
+            output: 'function f(a: number[]) { if (a.length) { return -1; } else { return a.at(0); } }',
+            errors: [{ messageId: 'index', },],
+        },
+        // a mutating call between a positive guard and the access (inside the block)
+        {
+            ...withCheckAll('function f(a: number[]) { if (a.length) { a.pop(); return a[0]; } return -1; }'),
+            output: 'function f(a: number[]) { if (a.length) { a.pop(); return a.at(0); } return -1; }',
+            errors: [{ messageId: 'index', },],
+        },
+        // `&&` with an intervening call (comma) before the access → may mutate
+        {
+            ...withCheckAll('function f(a: number[], g: () => void) { return (a.length > 0 && (g(), a[0])) || -1; }'),
+            output: 'function f(a: number[], g: () => void) { return (a.length > 0 && (g(), a.at(0))) || -1; }',
+            errors: [{ messageId: 'index', },],
+        },
+        // bracket-form mutator `a['pop']()` between the guard and the access
+        {
+            ...withCheckAll('function f() { const a = [1]; if (!a.length) return -1; a[\'pop\'](); return a[0]; }'),
+            output: 'function f() { const a = [1]; if (!a.length) return -1; a[\'pop\'](); return a.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        // a same-named variable shadowed in an inner block is NOT covered by the outer guard
+        {
+            ...withCheckAll('function f(a: string[]) { if (!a.length) return \'\'; { const a: string[] = []; return a[0]; } }'),
+            output: 'function f(a: string[]) { if (!a.length) return \'\'; { const a: string[] = []; return a.at(0); } }',
+            errors: [{ messageId: 'index', },],
+        },
+        // a custom `.split(): T[]` (non-string receiver) can return [] → not exempt
+        {
+            ...withCheckAll('class C { split(_s: string): string[] { return []; } } function f(c: C) { return c.split(\',\')[0]; }'),
+            output: 'class C { split(_s: string): string[] { return []; } } function f(c: C) { return c.split(\',\').at(0); }',
             errors: [{ messageId: 'index', },],
         },
         {

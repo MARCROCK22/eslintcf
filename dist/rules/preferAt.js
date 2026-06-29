@@ -8,28 +8,39 @@ port of all four detection paths (index access, `String#charAt`, the first
 element of `.slice(-n)` / `.shift()` / `.pop()`, and get-last functions such as
 `_.last`) WITH autofix and suggestions, faithful to unicorn.
 
-Differences vs unicorn (the customizations), both in the INDEX-ACCESS path only,
+Differences vs unicorn (the customizations), all in the INDEX-ACCESS path only,
 exempting access whose element is PROVABLY present (so `.at()` would only widen
 the type to `T | undefined` for nothing):
 
-1. `<expr>.split('<non-empty>')[0]` — split with a non-empty separator (resolved
-   statically, so named constants count) always yields a non-empty array. Empty/
-   dynamic separators, a `limit` argument, or any index other than `0` are still
-   reported.
+1. `<string>.split('<non-empty>')[0]` — a non-empty separator (resolved statically,
+   so named constants count) always yields a non-empty array. When type info is
+   available the receiver must be a string (a custom `split(): T[]` can return `[]`).
+   Empty/dynamic separators, a `limit` argument, or any index other than `0` are
+   still reported.
 
-2. Type-aware (reads the TS type): `<tuple>[k]` and `<tuple>[<tuple>.length - k]`
-   when the receiver is a fixed-length TUPLE whose element is guaranteed to exist
-   (`k < minLength` / `minLength >= k`). A plain `T[]` is NOT exempt (it can be
-   empty). Degrades to no exemption when type info is unavailable.
+2. Statically-known length: an array literal, string/template literal, or `.concat`
+   chain whose minimum length is known (`[1, 2, 3][2]`, `'ab'[0]`, `[0].concat(x)[0]`),
+   read inline or through an effectively-const / non-escaping variable.
 
-3. Control-flow: `V[k]` when a preceding early-exit guard in the same block proves
-   index k is present (exit via `return`/`throw`/`break`/`continue`): a length
-   guard `if (!V.length)` / `if (V.length < m)` / `if (V.length <= n)` (for an
-   array OR string), or — for a STRING only — a truthiness/empty guard `if (!V)` /
-   `if (V === '')` (covers `k === 0`; an empty array is truthy so this is unsound
-   for arrays). Requires `V` to be an effectively-const Identifier and a LITERAL
-   index. A missing/insufficient guard, a reassignable `V`, or a wrong receiver
-   type is still reported.
+3. Type-aware (reads the TS type): `<tuple>[k]` / `<tuple>[<tuple>.length - k]` for a
+   fixed-length READONLY tuple whose element is guaranteed to exist. A mutable tuple
+   (it can be `pop`-ed, or be an `as`-cast lie) or a plain `T[]` is NOT exempt.
+
+4. Control-flow: `V[k]` when a condition that DOMINATES the access proves the length —
+   an early-exit guard, a positive `if`/`else` branch, a ternary branch, an `&&`/`||`
+   operand, or a `switch (V.length)` case, at any nesting depth, including via a boolean
+   flag derived from `.length`. Length comparisons (`!V.length`, `V.length > m`,
+   `>= m`, `=== c`, and their negations/compounds) work for arrays AND strings; a bare
+   truthiness / `=== ''` guard works for STRINGS only (an empty array is truthy). The
+   index may be a literal or a const that resolves to one. The receiver must be
+   IMMUTABLE for the proof to still hold at the access: a string that is never
+   reassigned, or an array that never escapes or mutates (`isNonEscapingArray` — `const`
+   alone does not stop `pop`/`splice`/`length =`/`delete`/aliasing). Shadowed bindings,
+   wrong-direction guards, and mutated/escaping receivers are still reported.
+
+Residual unsoundness (inherent to intra-procedural + type-aware analysis, shared with
+the type checker itself): inter-procedural aliasing (a callee mutating the receiver via
+a caller-held alias), `as`-cast type lies, and sparse arrays (`new Array(n)`).
 
 None of these exemptions is applied to the `charAt`/`slice`/get-last paths.
 
@@ -181,77 +192,51 @@ function negativeIndexK(indexNode, lengthNode) {
 //   'string' — proves V is a non-empty STRING (valid ONLY for strings, since an
 //       empty array is truthy):  !V / V === '' / '' === V  ->  k === 0
 //   null — not a recognized sufficient guard.
-function guardCoversIndex(test, objectName, k) {
-    const isLengthOf = (n) => n.type === 'MemberExpression'
-        && !n.computed
-        && n.object.type === 'Identifier'
-        && n.object.name === objectName
-        && n.property.type === 'Identifier'
-        && n.property.name === 'length';
-    const isObject = (n) => n.type === 'Identifier' && n.name === objectName;
-    const intValue = (n) => {
-        if (n.type === 'Literal' && typeof n.value === 'number' && Number.isInteger(n.value) && n.value >= 0) {
-            return n.value;
-        }
-        return null;
-    };
-    if (test.type === 'UnaryExpression' && test.operator === '!') {
-        if (k !== 0) {
-            return null;
-        }
-        if (isLengthOf(test.argument)) {
-            return 'length';
-        }
-        if (isObject(test.argument)) {
-            return 'string';
-        }
-        return null;
+const FUNCTION_NODE_TYPES = new Set([
+    'FunctionExpression',
+    'FunctionDeclaration',
+    'ArrowFunctionExpression',
+]);
+// Comparison-operator transforms used to reason about length bounds.
+// `negateOp`: the operator of the logical negation (`a < b` false ⇔ `a >= b`); null
+// if `operator` is not a comparison. `swapOp`: the operator with operands swapped
+// (`a < b` ⇔ `b > a`).
+function negateOp(operator) {
+    switch (operator) {
+        case '===': return '!==';
+        case '!==': return '===';
+        case '==': return '!=';
+        case '!=': return '==';
+        case '<': return '>=';
+        case '>=': return '<';
+        case '>': return '<=';
+        case '<=': return '>';
+        default: return null;
     }
-    if (test.type !== 'BinaryExpression') {
-        return null;
+}
+function swapOp(operator) {
+    switch (operator) {
+        case '<': return '>';
+        case '>': return '<';
+        case '<=': return '>=';
+        case '>=': return '<=';
+        default: return operator;
     }
-    const { operator, left, right, } = test;
-    if (operator === '===' || operator === '==') {
-        if (k !== 0) {
-            return null;
-        }
-        if (isLengthOf(left) && isLiteral(right, 0) || isLiteral(left, 0) && isLengthOf(right)) {
-            return 'length';
-        }
-        if (isObject(left) && isLiteral(right, '') || isLiteral(left, '') && isObject(right)) {
-            return 'string';
-        }
-        return null;
+}
+// The lower bound on length implied by a TRUE comparison `length <operator> c`
+// (`c` a non-negative integer); 0 means "no positive lower bound is proven".
+function lenBoundFromCmp(operator, c) {
+    switch (operator) {
+        case '===':
+        case '==': return c;
+        case '>': return c + 1;
+        case '>=': return c;
+        case '!==':
+        case '!=': return c === 0
+            ? 1
+            : 0;
+        default: return 0;
     }
-    if (operator === '<' && isLengthOf(left)) {
-        const m = intValue(right);
-        if (m !== null && k <= m - 1) {
-            return 'length';
-        }
-        return null;
-    }
-    if (operator === '>' && isLengthOf(right)) {
-        const m = intValue(left);
-        if (m !== null && k <= m - 1) {
-            return 'length';
-        }
-        return null;
-    }
-    if (operator === '<=' && isLengthOf(left)) {
-        const n = intValue(right);
-        if (n !== null && k <= n) {
-            return 'length';
-        }
-        return null;
-    }
-    if (operator === '>=' && isLengthOf(right)) {
-        const n = intValue(left);
-        if (n !== null && k <= n) {
-            return 'length';
-        }
-        return null;
-    }
-    return null;
 }
 // Whether `statement` definitely transfers control out (no fall-through).
 function definitelyExits(statement) {
@@ -383,38 +368,310 @@ export default function create(createRule) {
                     if (outer.type === 'UnaryExpression' && outer.operator === 'delete' && outer.argument === member) {
                         return false;
                     }
+                    // A method call on the receiver (`a.pop()` OR `a['pop']()`) may mutate it.
+                    // Must precede the `member.computed` short-circuit, else a bracket-form
+                    // mutator slips through as if it were a plain `a[i]` read.
+                    if (outer.type === 'CallExpression' && outer.callee === member) {
+                        return false;
+                    }
                     if (member.computed) {
                         return true;
                     }
                     return member.property.type === 'Identifier' && member.property.name === 'length';
                 });
             };
-            // The kind of dominating early-exit guard (a preceding sibling in the same
-            // block) that guarantees index `k` is present: `'length'` (array/string) or
-            // `'string'` (string only), or null if there is none.
-            const dominatingGuardKind = (accessNode, objectName, k) => {
-                let statement = accessNode;
-                while (statement.parent !== undefined) {
-                    const body = getStatementListBody(statement.parent);
-                    if (body !== null) {
-                        const index = body.indexOf(statement);
-                        for (let i = 0; i < index; i++) {
-                            const sibling = body[i];
-                            if (sibling.type === 'IfStatement'
-                                && sibling.alternate === null
-                                && definitelyExits(sibling.consequent)) {
-                                const kind = guardCoversIndex(sibling.test, objectName, k);
-                                if (kind !== null) {
-                                    return kind;
-                                }
-                            }
-                        }
-                        // Same block only (a block cannot redeclare a const name → no shadowing).
-                        return null;
-                    }
-                    statement = statement.parent;
+            function mkB(len, str) {
+                return {
+                    len,
+                    str,
+                };
+            }
+            const ZERO = mkB(0, 0);
+            const maxB = (a, b) => mkB(Math.max(a.len, b.len), Math.max(a.str, b.str));
+            const intLiteralValue = (n) => {
+                if (n.type === 'Literal' && typeof n.value === 'number' && Number.isInteger(n.value) && n.value >= 0) {
+                    return n.value;
                 }
                 return null;
+            };
+            // Whether `node` references the SAME binding as the access receiver — guards
+            // against a same-named variable shadowed in an inner scope while walking outward.
+            const refsTarget = (node, targetVar, name) => node.type === 'Identifier'
+                && node.name === name
+                && findVariable(sourceCode.getScope(node), name) === targetVar;
+            const isTargetLength = (node, targetVar, name) => node.type === 'MemberExpression'
+                && !node.computed
+                && node.property.type === 'Identifier'
+                && node.property.name === 'length'
+                && refsTarget(node.object, targetVar, name);
+            // The initializer of an effectively-const variable, else null — lets a boolean
+            // flag such as `const has = a.length > 0` be followed back to its test.
+            const constInitializerOf = (idNode) => {
+                if (!isEffectivelyConst(idNode)) {
+                    return null;
+                }
+                const def = findVariable(sourceCode.getScope(idNode), idNode.name)?.defs.at(0);
+                if (def?.node.type === 'VariableDeclarator' && def.node.init !== null) {
+                    return def.node.init;
+                }
+                return null;
+            };
+            // Lower bounds on `targetVar.length` implied by `expr` being truthy/falsy.
+            const conditionBounds = (expr, targetVar, name, whenTruthy) => {
+                if (expr.type === 'UnaryExpression' && expr.operator === '!') {
+                    return conditionBounds(expr.argument, targetVar, name, !whenTruthy);
+                }
+                if (expr.type === 'LogicalExpression' && (expr.operator === '&&' || expr.operator === '||')) {
+                    const a = conditionBounds(expr.left, targetVar, name, whenTruthy);
+                    const b = conditionBounds(expr.right, targetVar, name, whenTruthy);
+                    // `&&` truthy / `||` falsy ⇒ BOTH operands hold (take the stronger bound);
+                    // otherwise only one is known to hold (take the weaker bound that survives).
+                    const conjunction = expr.operator === '&&';
+                    const bothHold = conjunction === whenTruthy;
+                    let pick = Math.min;
+                    if (bothHold) {
+                        pick = Math.max;
+                    }
+                    return mkB(pick(a.len, b.len), pick(a.str, b.str));
+                }
+                if (expr.type === 'Identifier' && !refsTarget(expr, targetVar, name)) {
+                    const init = constInitializerOf(expr);
+                    if (init === null) {
+                        return ZERO;
+                    }
+                    return conditionBounds(init, targetVar, name, whenTruthy);
+                }
+                if (isTargetLength(expr, targetVar, name)) {
+                    if (whenTruthy) {
+                        return mkB(1, 0);
+                    }
+                    return ZERO;
+                }
+                if (refsTarget(expr, targetVar, name)) {
+                    if (whenTruthy) {
+                        return mkB(0, 1);
+                    }
+                    return ZERO;
+                }
+                if (expr.type !== 'BinaryExpression') {
+                    return ZERO;
+                }
+                let operator = expr.operator;
+                if (!whenTruthy) {
+                    operator = negateOp(operator);
+                }
+                if (operator === null) {
+                    return ZERO;
+                }
+                if (isTargetLength(expr.left, targetVar, name)) {
+                    const c = intLiteralValue(expr.right);
+                    if (c === null) {
+                        return ZERO;
+                    }
+                    return mkB(lenBoundFromCmp(operator, c), 0);
+                }
+                if (isTargetLength(expr.right, targetVar, name)) {
+                    const c = intLiteralValue(expr.left);
+                    if (c === null) {
+                        return ZERO;
+                    }
+                    return mkB(lenBoundFromCmp(swapOp(operator), c), 0);
+                }
+                const isEmptyStr = (n) => n.type === 'Literal' && n.value === '';
+                const onEmptyString = refsTarget(expr.left, targetVar, name) && isEmptyStr(expr.right)
+                    || isEmptyStr(expr.left) && refsTarget(expr.right, targetVar, name);
+                if (onEmptyString && (operator === '!==' || operator === '!=')) {
+                    return mkB(0, 1);
+                }
+                return ZERO;
+            };
+            // Length lower bound from being inside a `case`/`default` of `switch (V.length)`,
+            // requiring every preceding case to be an integer literal that exits (no fall-through).
+            const switchBound = (switchCase, targetVar, name) => {
+                const sw = switchCase.parent;
+                if (sw.type !== 'SwitchStatement' || !isTargetLength(sw.discriminant, targetVar, name)) {
+                    return ZERO;
+                }
+                const excluded = new Set();
+                const myIndex = sw.cases.indexOf(switchCase);
+                for (let i = 0; i < myIndex; i++) {
+                    const clause = sw.cases[i];
+                    if (clause.test === null) {
+                        continue;
+                    }
+                    const value = intLiteralValue(clause.test);
+                    const last = clause.consequent.at(-1);
+                    if (value === null || last === undefined || !definitelyExits(last)) {
+                        return ZERO;
+                    }
+                    excluded.add(value);
+                }
+                if (switchCase.test === null) {
+                    let bound = 0;
+                    while (excluded.has(bound)) {
+                        bound++;
+                    }
+                    return mkB(bound, 0);
+                }
+                const value = intLiteralValue(switchCase.test);
+                if (value === null) {
+                    return ZERO;
+                }
+                return mkB(value, 0);
+            };
+            // Walk outward from the access, accumulating the strongest length lower bound
+            // proven by every condition that DOMINATES it: early-exit guards (preceding
+            // siblings), positive/`else` `if` branches, ternary branches, `&&`/`||` operands,
+            // and `switch (V.length)` cases. Stops at a function boundary (a guard outside a
+            // closure need not still hold when the closure runs) and at a `SequenceExpression`
+            // (a comma could run a mutating call between the guard and the access).
+            const provenLengthBound = (accessNode, targetVar, name) => {
+                let best = ZERO;
+                let node = accessNode;
+                let parent = node.parent;
+                // `.parent` is `undefined` mid-tree but `null` at the Program root.
+                while (parent !== undefined && parent !== null) {
+                    if (FUNCTION_NODE_TYPES.has(parent.type) || parent.type === 'SequenceExpression') {
+                        break;
+                    }
+                    if (parent.type === 'ConditionalExpression') {
+                        if (node === parent.consequent) {
+                            best = maxB(best, conditionBounds(parent.test, targetVar, name, true));
+                        }
+                        else if (node === parent.alternate) {
+                            best = maxB(best, conditionBounds(parent.test, targetVar, name, false));
+                        }
+                    }
+                    else if (parent.type === 'LogicalExpression') {
+                        if (node === parent.right) {
+                            best = maxB(best, conditionBounds(parent.left, targetVar, name, parent.operator === '&&'));
+                        }
+                    }
+                    else if (parent.type === 'IfStatement') {
+                        if (node === parent.consequent) {
+                            best = maxB(best, conditionBounds(parent.test, targetVar, name, true));
+                        }
+                        else if (node === parent.alternate) {
+                            best = maxB(best, conditionBounds(parent.test, targetVar, name, false));
+                        }
+                    }
+                    else {
+                        const body = getStatementListBody(parent);
+                        if (body !== null) {
+                            const index = body.indexOf(node);
+                            for (let i = 0; i < index; i++) {
+                                const sibling = body[i];
+                                if (sibling.type === 'IfStatement' && sibling.alternate === null && definitelyExits(sibling.consequent)) {
+                                    best = maxB(best, conditionBounds(sibling.test, targetVar, name, false));
+                                }
+                            }
+                            if (parent.type === 'SwitchCase') {
+                                best = maxB(best, switchBound(parent, targetVar, name));
+                            }
+                        }
+                    }
+                    node = parent;
+                    parent = parent.parent;
+                }
+                return best;
+            };
+            // Statically-known minimum length of an expression's VALUE: array literals
+            // (elements before any hole/spread), string/template literals, and `.concat`
+            // chains; null when not statically determinable.
+            const syntacticMinLength = (expr) => {
+                if (expr.type === 'ArrayExpression') {
+                    let count = 0;
+                    for (const element of expr.elements) {
+                        if (element === null || element.type === 'SpreadElement') {
+                            break;
+                        }
+                        count++;
+                    }
+                    return count;
+                }
+                if (expr.type === 'Literal' && typeof expr.value === 'string') {
+                    return expr.value.length;
+                }
+                if (expr.type === 'TemplateLiteral' && expr.expressions.length === 0) {
+                    return expr.quasis.at(0)?.value.cooked?.length ?? null;
+                }
+                if (expr.type === 'CallExpression'
+                    && expr.callee.type === 'MemberExpression'
+                    && !expr.callee.computed
+                    && expr.callee.property.type === 'Identifier'
+                    && expr.callee.property.name === 'concat') {
+                    let total = syntacticMinLength(expr.callee.object) ?? 0;
+                    for (const arg of expr.arguments) {
+                        if (arg.type === 'SpreadElement') {
+                            return null;
+                        }
+                        if (arg.type === 'ArrayExpression') {
+                            total += syntacticMinLength(arg) ?? 0;
+                        }
+                        else if (arg.type === 'Literal') {
+                            total += 1;
+                        }
+                        // a non-literal arg may be an array (flattened, >= 0 elements) → adds 0
+                    }
+                    return total;
+                }
+                return null;
+            };
+            // Minimum length of `objectNode`'s value, following an effectively-const /
+            // non-escaping variable back to its initializer; null when undeterminable.
+            const staticMinLength = (objectNode) => {
+                if (objectNode.type !== 'Identifier') {
+                    return syntacticMinLength(objectNode);
+                }
+                const def = findVariable(sourceCode.getScope(objectNode), objectNode.name)?.defs.at(0);
+                if (def?.node.type !== 'VariableDeclarator' || def.node.init === null) {
+                    return null;
+                }
+                const min = syntacticMinLength(def.node.init);
+                if (min === null) {
+                    return null;
+                }
+                const { init, } = def.node;
+                const isString = init.type === 'Literal' && typeof init.value === 'string' || init.type === 'TemplateLiteral';
+                if (isString
+                    ? !isEffectivelyConst(objectNode)
+                    : !isNonEscapingArray(objectNode)) {
+                    return null;
+                }
+                return min;
+            };
+            // Whether the accessed receiver's length is provably `>= need` (so the indexed
+            // element is present): from a readonly tuple type, a statically-known length, or
+            // a dominating guard. For a guard, the receiver must be immutable — a string that
+            // is never reassigned, or an array that never escapes or mutates.
+            const guaranteedLengthAtLeast = (accessNode, objectNode, need) => {
+                if (need <= 0) {
+                    return true;
+                }
+                const objectType = getNodeType(objectNode);
+                if (objectType !== null) {
+                    const minLength = tupleMinLength(objectType);
+                    if (minLength !== null && minLength >= need) {
+                        return true;
+                    }
+                }
+                const staticLen = staticMinLength(objectNode);
+                if (staticLen !== null && staticLen >= need) {
+                    return true;
+                }
+                if (objectNode.type === 'Identifier') {
+                    const targetVar = findVariable(sourceCode.getScope(objectNode), objectNode.name);
+                    if (targetVar !== null) {
+                        const bounds = provenLengthBound(accessNode, targetVar, objectNode.name);
+                        if (bounds.len >= need && isLengthIndexableObject(objectNode) && isNonEscapingArray(objectNode)) {
+                            return true;
+                        }
+                        if (Math.max(bounds.len, bounds.str) >= need && isStringObject(objectNode) && isEffectivelyConst(objectNode)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
             };
             // `<expr>.split('<non-empty>')[0]` — the first element is always present.
             // Separator resolved statically so named constants count, not just magic
@@ -432,9 +689,17 @@ export default function create(createRule) {
                 }
                 const [separatorNode,] = objectNode.arguments;
                 const separator = getStaticValue(separatorNode, sourceCode.getScope(separatorNode));
-                return separator !== null
-                    && typeof separator.value === 'string'
-                    && separator.value.length > 0;
+                if (separator === null || typeof separator.value !== 'string' || separator.value.length === 0) {
+                    return false;
+                }
+                // The "element 0 always present" guarantee is `String.prototype.split`'s — a
+                // custom `split(): T[]` or an `any` receiver can return `[]`. When type info is
+                // available, require a string receiver; otherwise stay syntactic (best effort).
+                const receiver = objectNode.callee.object;
+                if (getNodeType(receiver) !== null) {
+                    return isStringObject(receiver);
+                }
+                return true;
             };
             // `.slice()`
             const checkSlice = (sliceCall) => {
@@ -610,69 +875,33 @@ export default function create(createRule) {
                     const indexNode = node.property;
                     const lengthNode = getNegativeIndexLengthNode(indexNode, node.object);
                     if (lengthNode) {
-                        // Type-aware: `<tuple>[<tuple>.length - k]` indexes a present element
-                        // when the tuple's guaranteed length is >= k (so `length - k >= 0`).
+                        // `<expr>[<expr>.length - k]` indexes a present element when the
+                        // receiver's guaranteed length is >= k (so `length - k >= 0`).
                         const k = negativeIndexK(indexNode, lengthNode);
-                        if (k !== null) {
-                            const objectType = getNodeType(node.object);
-                            if (objectType !== null) {
-                                const minLength = tupleMinLength(objectType);
-                                if (minLength !== null && minLength >= k) {
-                                    return;
-                                }
-                            }
+                        if (k !== null && guaranteedLengthAtLeast(node, node.object, k)) {
+                            return;
                         }
                     }
                     else {
                         if (!checkAllIndexAccess) {
                             return;
                         }
-                        // Only if we are sure it's a non-negative integer.
+                        // Only if we are sure it's a non-negative integer (a literal, or a
+                        // const that resolves to one — e.g. `const FIRST = 0; a[FIRST]`).
                         const staticValue = getStaticValue(indexNode, sourceCode.getScope(indexNode));
                         if (!staticValue || !Number.isInteger(staticValue.value) || staticValue.value < 0) {
                             return;
                         }
-                        // Customization: a LITERAL `<expr>.split('<non-empty>')[0]` always has
-                        // a first element, so `.at(0)` would only add a spurious `| undefined`.
-                        // Literal `0` only — a resolved-to-0 expression may be a mutated const.
-                        if (isLiteral(indexNode, 0) && isFirstSplitElementAlwaysPresent(node.object)) {
+                        const k = staticValue.value;
+                        // `<string>.split('<non-empty>')[0]` always has a first element.
+                        if (k === 0 && isFirstSplitElementAlwaysPresent(node.object)) {
                             return;
                         }
-                        // Type-aware: `<tuple>[k]` is always present when `k` is within the
-                        // tuple's required elements, so `.at(k)` would only widen to `T | undefined`.
-                        // A plain `T[]` is NOT exempt (it can be empty).
-                        const objectType = getNodeType(node.object);
-                        if (objectType !== null) {
-                            const minLength = tupleMinLength(objectType);
-                            if (minLength !== null && staticValue.value < minLength) {
-                                return;
-                            }
-                        }
-                        // Control-flow: `if (V too short / empty) <exit>; … V[k]` — a
-                        // dominating early-exit guard proves index k is present, so `.at(k)`
-                        // would only widen to `T | undefined`. The index must be a literal (a
-                        // resolved-const value could be mutated). A STRING receiver only needs
-                        // to be never-reassigned (immutable); an ARRAY receiver must also never
-                        // escape or mutate — `const` does not prevent `pop`/`splice`/`length =`/
-                        // aliasing/`delete` (see isNonEscapingArray).
-                        if (indexNode.type === 'Literal'
-                            && typeof indexNode.value === 'number'
-                            && Number.isInteger(indexNode.value)
-                            && indexNode.value >= 0
-                            && node.object.type === 'Identifier') {
-                            const guardKind = dominatingGuardKind(node, node.object.name, indexNode.value);
-                            // String receiver: immutable, so never-reassigned is enough.
-                            if ((guardKind === 'string' || guardKind === 'length')
-                                && isStringObject(node.object)
-                                && isEffectivelyConst(node.object)) {
-                                return;
-                            }
-                            // Array receiver: mutable, so it must never escape or mutate.
-                            if (guardKind === 'length'
-                                && isLengthIndexableObject(node.object)
-                                && isNonEscapingArray(node.object)) {
-                                return;
-                            }
+                        // `<expr>[k]` is present when the receiver's length is provably > k
+                        // (readonly tuple, statically-known length, or a dominating guard), so
+                        // `.at(k)` would only widen the type to `T | undefined`.
+                        if (guaranteedLengthAtLeast(node, node.object, k + 1)) {
+                            return;
                         }
                     }
                     // Faithful to unicorn: `arguments[arguments.length - 1]` is reported
