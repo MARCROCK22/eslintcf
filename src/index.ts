@@ -1,7 +1,6 @@
 import perfectionist from 'eslint-plugin-perfectionist';
 import stylistic from '@stylistic/eslint-plugin';
 import { defineConfig, } from 'eslint/config';
-import unicorn from 'eslint-plugin-unicorn';
 import tseslint from 'typescript-eslint';
 import eslint from '@eslint/js';
 
@@ -435,22 +434,15 @@ export default defineConfig(
     },
     {
         plugins: {
-            unicorn,
-        },
-        rules: {
-            'unicorn/prefer-at': ['error', {
-                checkAllIndexAccess: true,
-            },],
-        },
-    },
-    {
-        plugins: {
             marcrock: rules,
         },
         rules: {
             'marcrock/uppercase-first-class-letter': 'error',
             'marcrock/no-newline-if-body-class-empty': 'error',
             'marcrock/numeric-separators': 'error',
+            'marcrock/prefer-at': ['error', {
+                checkAllIndexAccess: true,
+            },],
         },
     }
 );
