@@ -82,14 +82,19 @@ ruleTester.run('prefer-at', rule, {
         // index is not a literal `0` (a resolved const member could be mutated) → stays
         withCheckAll('const C = { i: 0 }; \'a.b\'.split(\'.\').at(C.i);'),
 
-        // --- NEW: type-aware tuple exemption — only READONLY tuples (a mutable
-        // tuple can be `pop()`-ed, or be an `as [...]` cast that lies) ---------
+        // --- NEW: type-aware tuple exemption — a readonly tuple is immutable; a
+        // MUTABLE tuple is exempt only when the receiver never escapes or mutates ---
         withCheckAll('declare const t: readonly [string, number]; t[0];'),
         withCheckAll('declare const t: readonly [string, number]; t[1];'),
         withCheckAll('const t = [10, 20, 30] as const; t[2];'),
         // last element via `[length - 1]` on a readonly tuple (minLength >= 1)
         'declare const t: readonly [string, number]; t[t.length - 1];',
         'declare const t: readonly [string, number?]; t[t.length - 1];',
+        // a MUTABLE tuple that is only read (never escapes/mutates) is exempt too
+        withCheckAll('declare const t: [string, number]; t[1];'),
+        'declare const t: [string, number]; t[t.length - 1];',
+        // the api.ts shape: a mutable tuple element read inside a `.map` callback
+        withCheckAll('declare const pairs: [string, number][]; pairs.map((kv) => kv[0] + kv[1]);'),
 
         // --- NEW: control-flow length-guard exemption (early-exit guard) -----
         withCheckAll('function f(r: string[]) { if (!r.length) return; return r[0]; }'),
@@ -105,6 +110,9 @@ ruleTester.run('prefer-at', rule, {
         // string truthiness/empty guard (the capitalize.ts shape): `!str` / `str === ''`
         withCheckAll('function f(str: string) { if (!str) return \'\'; return str[0]; }'),
         withCheckAll('function f(str: string) { if (str === \'\') return \'\'; return str[0]; }'),
+        // a STRING reassigned then RE-GUARDED is exempt (the later guard dominates the
+        // access, after the reassignment — the capitalize.ts shape)
+        withCheckAll('function f(str: string) { if (!str) return \'\'; str = str.trim(); if (!str) return \'\'; return str[0]; }'),
         // a `.length` guard also covers strings, including higher indices
         withCheckAll('function f(str: string) { if (str.length < 2) return \'\'; return str[1]; }'),
         // reversed operands also work: `0 === V.length`, `m > V.length`, `n >= V.length`
@@ -316,17 +324,17 @@ ruleTester.run('prefer-at', rule, {
             output: 'declare const t: [string?]; t.at(-1);',
             errors: [{ messageId: 'negativeIndex', },],
         },
-        // --- NEW: soundness regressions — a MUTABLE tuple is NOT exempt (it can
-        // be `pop()`-ed, or be an `as [...]` cast that lies about a short array)
+        // --- NEW: soundness regressions — a mutable tuple that MUTATES or ESCAPES is
+        // NOT exempt (a non-mutating, non-escaping one IS exempt — see valid cases)
         {
-            ...withCheckAll('declare const t: [string, number]; t[1];'),
-            output: 'declare const t: [string, number]; t.at(1);',
+            ...withCheckAll('function f() { const t: [string, number] = [\'a\', 1]; t.pop(); return t[1]; }'),
+            output: 'function f() { const t: [string, number] = [\'a\', 1]; t.pop(); return t.at(1); }',
             errors: [{ messageId: 'index', },],
         },
         {
-            code: 'declare const t: [string, number]; t[t.length - 1];',
-            output: 'declare const t: [string, number]; t.at(-1);',
-            errors: [{ messageId: 'negativeIndex', },],
+            ...withCheckAll('function f(g: (x: unknown) => void) { const t: [string, number] = [\'a\', 1]; g(t); return t[1]; }'),
+            output: 'function f(g: (x: unknown) => void) { const t: [string, number] = [\'a\', 1]; g(t); return t.at(1); }',
+            errors: [{ messageId: 'index', },],
         },
         // a const array MUTATED after the guard can be emptied → guard no longer
         // holds → flagged (const blocks rebinding, not in-place mutation)

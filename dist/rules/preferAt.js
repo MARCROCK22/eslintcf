@@ -23,8 +23,9 @@ the type to `T | undefined` for nothing):
    read inline or through an effectively-const / non-escaping variable.
 
 3. Type-aware (reads the TS type): `<tuple>[k]` / `<tuple>[<tuple>.length - k]` for a
-   fixed-length READONLY tuple whose element is guaranteed to exist. A mutable tuple
-   (it can be `pop`-ed, or be an `as`-cast lie) or a plain `T[]` is NOT exempt.
+   fixed-length tuple whose element is guaranteed to exist. A READONLY tuple is exempt
+   outright; a MUTABLE tuple only when its receiver never escapes or mutates (like a
+   plain array — it could otherwise be `pop`-ed). A plain `T[]` is NOT exempt.
 
 4. Control-flow: `V[k]` when a condition that DOMINATES the access proves the length —
    an early-exit guard, a positive `if`/`else` branch, a ternary branch, an `&&`/`||`
@@ -32,11 +33,13 @@ the type to `T | undefined` for nothing):
    flag derived from `.length`. Length comparisons (`!V.length`, `V.length > m`,
    `>= m`, `=== c`, and their negations/compounds) work for arrays AND strings; a bare
    truthiness / `=== ''` guard works for STRINGS only (an empty array is truthy). The
-   index may be a literal or a const that resolves to one. The receiver must be
-   IMMUTABLE for the proof to still hold at the access: a string that is never
-   reassigned, or an array that never escapes or mutates (`isNonEscapingArray` — `const`
-   alone does not stop `pop`/`splice`/`length =`/`delete`/aliasing). Shadowed bindings,
-   wrong-direction guards, and mutated/escaping receivers are still reported.
+   index may be a literal or a const that resolves to one. The receiver must hold the
+   proven value at the access: a STRING must not be reassigned between the dominating
+   guard and the access (a reassignment that is then re-guarded is fine — only guards
+   after the last reassignment count); an ARRAY must never escape or mutate
+   (`isNonEscapingArray` — `const` alone does not stop `pop`/`splice`/`length =`/
+   `delete`/aliasing). Shadowed bindings, wrong-direction guards, reassigned-without-
+   reguard receivers, and mutated/escaping receivers are still reported.
 
 Residual unsoundness (inherent to intra-procedural + type-aware analysis, shared with
 the type checker itself): inter-procedural aliasing (a callee mutating the receiver via
@@ -125,11 +128,10 @@ function checkSliceCall(node) {
     };
 }
 // --- tuple soundness (type-aware index exemption) -----------------------------
-// The READONLY TupleType target of `type`, or null otherwise. Only readonly tuples
-// are immutable: a mutable tuple can be `pop()`-ed (or be the result of an
-// `as [T, T]` cast that lies about a shorter runtime array), so its static length is
-// not a runtime guarantee. A readonly tuple (`as const` / `readonly [...]`) cannot be
-// mutated, so its element types are a real guarantee.
+// The TupleType target of `type` (readonly OR mutable), or null when not a tuple
+// reference. Readonly-ness is decided separately (`tupleTypeIsReadonly`): a readonly
+// tuple is immutable; a mutable tuple's length is trusted only when the receiver also
+// never escapes or mutates (`isNonEscapingArray`) — exactly like a plain array.
 function tupleTargetOf(type) {
     if (!(type.flags & ts.TypeFlags.Object)) {
         return null;
@@ -141,11 +143,7 @@ function tupleTargetOf(type) {
     if (!(target.objectFlags & ts.ObjectFlags.Tuple)) {
         return null;
     }
-    const tuple = target;
-    if (!tuple.readonly) {
-        return null;
-    }
-    return tuple;
+    return target;
 }
 // Guaranteed minimum element count when EVERY constituent of `type` is a tuple,
 // else null (for a union the guarantee is the smallest minLength). `minLength` is
@@ -168,6 +166,16 @@ function tupleMinLength(type) {
         return null;
     }
     return min;
+}
+// Whether every constituent of `type` is a READONLY tuple (`as const` / `readonly
+// [...]`) — immutable, so its length holds without escape analysis. A mutable tuple
+// needs `isNonEscapingArray` instead.
+function tupleTypeIsReadonly(type) {
+    let constituents = [type,];
+    if (type.isUnion()) {
+        constituents = type.types;
+    }
+    return constituents.every((constituent) => tupleTargetOf(constituent)?.readonly === true);
 }
 // `k` from the `<obj>.length - k` negative-index pattern (positive integer), else null.
 function negativeIndexK(indexNode, lengthNode) {
@@ -524,8 +532,10 @@ export default function create(createRule) {
             // siblings), positive/`else` `if` branches, ternary branches, `&&`/`||` operands,
             // and `switch (V.length)` cases. Stops at a function boundary (a guard outside a
             // closure need not still hold when the closure runs) and at a `SequenceExpression`
-            // (a comma could run a mutating call between the guard and the access).
-            const provenLengthBound = (accessNode, targetVar, name) => {
+            // (a comma could run a mutating call between the guard and the access). Only guards
+            // positioned after `minGuardPos` count — a guard before the receiver's last
+            // reassignment proved a now-stale value (pass -1 to count every guard).
+            const provenLengthBound = (accessNode, targetVar, name, minGuardPos) => {
                 let best = ZERO;
                 let node = accessNode;
                 let parent = node.parent;
@@ -534,24 +544,26 @@ export default function create(createRule) {
                     if (FUNCTION_NODE_TYPES.has(parent.type) || parent.type === 'SequenceExpression') {
                         break;
                     }
+                    const [parentStart,] = parent.range;
+                    const guardLive = parentStart > minGuardPos;
                     if (parent.type === 'ConditionalExpression') {
-                        if (node === parent.consequent) {
+                        if (guardLive && node === parent.consequent) {
                             best = maxB(best, conditionBounds(parent.test, targetVar, name, true));
                         }
-                        else if (node === parent.alternate) {
+                        else if (guardLive && node === parent.alternate) {
                             best = maxB(best, conditionBounds(parent.test, targetVar, name, false));
                         }
                     }
                     else if (parent.type === 'LogicalExpression') {
-                        if (node === parent.right) {
+                        if (guardLive && node === parent.right) {
                             best = maxB(best, conditionBounds(parent.left, targetVar, name, parent.operator === '&&'));
                         }
                     }
                     else if (parent.type === 'IfStatement') {
-                        if (node === parent.consequent) {
+                        if (guardLive && node === parent.consequent) {
                             best = maxB(best, conditionBounds(parent.test, targetVar, name, true));
                         }
-                        else if (node === parent.alternate) {
+                        else if (guardLive && node === parent.alternate) {
                             best = maxB(best, conditionBounds(parent.test, targetVar, name, false));
                         }
                     }
@@ -561,11 +573,12 @@ export default function create(createRule) {
                             const index = body.indexOf(node);
                             for (let i = 0; i < index; i++) {
                                 const sibling = body[i];
-                                if (sibling.type === 'IfStatement' && sibling.alternate === null && definitelyExits(sibling.consequent)) {
+                                const [siblingStart,] = sibling.range;
+                                if (sibling.type === 'IfStatement' && sibling.alternate === null && definitelyExits(sibling.consequent) && siblingStart > minGuardPos) {
                                     best = maxB(best, conditionBounds(sibling.test, targetVar, name, false));
                                 }
                             }
-                            if (parent.type === 'SwitchCase') {
+                            if (parent.type === 'SwitchCase' && guardLive) {
                                 best = maxB(best, switchBound(parent, targetVar, name));
                             }
                         }
@@ -640,10 +653,25 @@ export default function create(createRule) {
                 }
                 return min;
             };
+            // The end position of `variable`'s last reassignment that precedes `accessNode`,
+            // or -1 if none — a guard before this no longer holds at the access (only a later
+            // re-guard can re-establish the bound).
+            const lastWriteEndBefore = (variable, accessNode) => {
+                const [accessStart,] = accessNode.range;
+                let maxEnd = -1;
+                for (const reference of variable.references) {
+                    const [, refEnd,] = reference.identifier.range;
+                    if (reference.isWrite() && reference.init !== true && refEnd <= accessStart) {
+                        maxEnd = Math.max(maxEnd, refEnd);
+                    }
+                }
+                return maxEnd;
+            };
             // Whether the accessed receiver's length is provably `>= need` (so the indexed
-            // element is present): from a readonly tuple type, a statically-known length, or
-            // a dominating guard. For a guard, the receiver must be immutable — a string that
-            // is never reassigned, or an array that never escapes or mutates.
+            // element is present): from a tuple type, a statically-known length, or a
+            // dominating guard. The receiver must be immutable for the proof to hold at the
+            // access — a readonly tuple, or a non-escaping receiver (string / array / mutable
+            // tuple); a guard before a reassignment of the receiver is ignored.
             const guaranteedLengthAtLeast = (accessNode, objectNode, need) => {
                 if (need <= 0) {
                     return true;
@@ -652,7 +680,14 @@ export default function create(createRule) {
                 if (objectType !== null) {
                     const minLength = tupleMinLength(objectType);
                     if (minLength !== null && minLength >= need) {
-                        return true;
+                        // A readonly tuple is immutable; a mutable one is trusted only when
+                        // the receiver never escapes or mutates (exactly like a plain array).
+                        if (tupleTypeIsReadonly(objectType)) {
+                            return true;
+                        }
+                        if (objectNode.type === 'Identifier' && isNonEscapingArray(objectNode)) {
+                            return true;
+                        }
                     }
                 }
                 const staticLen = staticMinLength(objectNode);
@@ -662,11 +697,12 @@ export default function create(createRule) {
                 if (objectNode.type === 'Identifier') {
                     const targetVar = findVariable(sourceCode.getScope(objectNode), objectNode.name);
                     if (targetVar !== null) {
-                        const bounds = provenLengthBound(accessNode, targetVar, objectNode.name);
+                        // Only guards positioned after the receiver's last reassignment hold.
+                        const bounds = provenLengthBound(accessNode, targetVar, objectNode.name, lastWriteEndBefore(targetVar, accessNode));
                         if (bounds.len >= need && isLengthIndexableObject(objectNode) && isNonEscapingArray(objectNode)) {
                             return true;
                         }
-                        if (Math.max(bounds.len, bounds.str) >= need && isStringObject(objectNode) && isEffectivelyConst(objectNode)) {
+                        if (Math.max(bounds.len, bounds.str) >= need && isStringObject(objectNode)) {
                             return true;
                         }
                     }
