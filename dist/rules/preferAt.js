@@ -336,14 +336,16 @@ export default function create(createRule) {
                 }
                 return parts.every((part) => (part.flags & ts.TypeFlags.StringLike) !== 0);
             };
-            // Whether `idNode` resolves to a variable that is never reassigned (only its
-            // initializer writes it) — so a guarded non-emptiness still holds at the access.
+            // Whether `idNode` resolves to a variable that is never reassigned — so a
+            // guarded non-emptiness still holds at the access. A write counts as a
+            // reassignment UNLESS it is the declaration initializer; a parameter has no
+            // initializer write, so a single `x = …` to a parameter is a reassignment.
             const isEffectivelyConst = (idNode) => {
                 const variable = findVariable(sourceCode.getScope(idNode), idNode.name);
                 if (variable === null) {
                     return false;
                 }
-                return variable.references.filter((reference) => reference.isWrite()).length <= 1;
+                return variable.references.every((reference) => !reference.isWrite() || reference.init === true);
             };
             // The kind of dominating early-exit guard (a preceding sibling in the same
             // block) that guarantees index `k` is present: `'length'` (array/string) or

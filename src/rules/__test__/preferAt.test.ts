@@ -318,6 +318,19 @@ ruleTester.run('prefer-at', rule, {
             output: 'function f() { let r = [\'a\']; if (!r.length) return; r = []; return r.at(0); }',
             errors: [{ messageId: 'index', },],
         },
+        // a PARAMETER reassigned after the guard is also NOT const (it has no
+        // initializer write, so a single `x = …` is a reassignment) — the capitalize.ts
+        // case the previous threshold missed
+        {
+            ...withCheckAll('function f(str: string) { if (!str) return \'\'; str = \'\'; return str[0]; }'),
+            output: 'function f(str: string) { if (!str) return \'\'; str = \'\'; return str.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
+        {
+            ...withCheckAll('function f(r: string[]) { if (!r.length) return; r = []; return r[0]; }'),
+            output: 'function f(r: string[]) { if (!r.length) return; r = []; return r.at(0); }',
+            errors: [{ messageId: 'index', },],
+        },
         // receiver has `.length` but is not an array/string (index-signature object)
         {
             ...withCheckAll('function f(r: { length: number;[k: number]: string }) { if (!r.length) return; return r[0]; }'),
