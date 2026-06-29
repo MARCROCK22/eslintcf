@@ -437,6 +437,12 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                         return true;
                     }
                     const member = reference.identifier.parent;
+                    // `x is T` references the parameter in TYPE space only (a type-guard
+                    // predicate, e.g. `(kv): kv is [string, number] => …`) — no runtime read,
+                    // mutation, or escape, so it does not disqualify the receiver.
+                    if (member.type === 'TSTypePredicate') {
+                        return true;
+                    }
                     if (member.type !== 'MemberExpression' || member.object !== reference.identifier) {
                         return false;
                     }

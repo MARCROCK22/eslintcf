@@ -95,6 +95,9 @@ ruleTester.run('prefer-at', rule, {
         'declare const t: [string, number]; t[t.length - 1];',
         // the api.ts shape: a mutable tuple element read inside a `.map` callback
         withCheckAll('declare const pairs: [string, number][]; pairs.map((kv) => kv[0] + kv[1]);'),
+        // a type-guard predicate `kv is T` references the param in TYPE space only — it must
+        // not count as an escape (the api.ts `Object.entries(q).filter((kv): kv is [...] => kv[1])`)
+        withCheckAll('declare const pairs: [string, number][]; pairs.filter((kv): kv is [string, number] => kv[1] !== undefined);'),
 
         // --- NEW: control-flow length-guard exemption (early-exit guard) -----
         withCheckAll('function f(r: string[]) { if (!r.length) return; return r[0]; }'),
