@@ -125,6 +125,7 @@ export default defineConfig(
             '@typescript-eslint/unified-signatures': 'error',
             '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
             '@typescript-eslint/only-throw-error': 'error',
+            '@typescript-eslint/unbound-method': 'error',
             '@typescript-eslint/no-useless-empty-export': 'error',
             '@typescript-eslint/no-unnecessary-qualifier': 'error',
             '@typescript-eslint/no-unnecessary-template-expression': 'error',
