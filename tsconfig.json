@@ -23,6 +23,8 @@
 		"noFallthroughCasesInSwitch": true,
 		"skipLibCheck": true,
 		"noErrorTruncation": true,
+		"rootDir": "./src",
+		"types": ["node"],
 		"outDir": "./dist",
 		"stripInternal": true,
 		"declaration": true

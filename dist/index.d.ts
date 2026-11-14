@@ -1,2 +1,2 @@
-declare const _default: import("eslint/config").Config[];
+declare const _default: import("eslint/config").ConfigObject[];
 export default _default;
