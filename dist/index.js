@@ -17,6 +17,12 @@ export default defineConfig({
 }, eslint.configs.recommended, tseslint.configs.recommendedTypeChecked, tseslint.configs.stylisticTypeChecked, {
     languageOptions: {
         parserOptions: {
+            // @stylistic/comma-dangle keeps the comma of `<T,>() => …` in a .tsx file (without it the
+            // arrow function is a JSX element) only with jsx; typescript-eslint parses a .ts file
+            // without JSX all the same.
+            ecmaFeatures: {
+                jsx: true,
+            },
             projectService: true,
         },
     },
@@ -400,7 +406,9 @@ export default defineConfig({
         '@stylistic/nonblock-statement-body-position': ['error', 'below',],
         '@stylistic/object-curly-newline': 'error',
         '@stylistic/object-curly-spacing': ['error', 'always',],
-        '@stylistic/object-property-newline': 'error',
+        // All the properties on one line are allowed: @stylistic/exp-list-style joins the lines of
+        // `{ a,\nb }` again, and the two rules would undo each other's fixes.
+        '@stylistic/object-property-newline': ['error', { allowAllPropertiesOnSameLine: true, },],
         '@stylistic/one-var-declaration-per-line': 'error',
         '@stylistic/quote-props': ['error', 'as-needed',],
         '@stylistic/quotes': ['error', 'single',],
