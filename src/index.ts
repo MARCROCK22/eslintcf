@@ -397,7 +397,9 @@ export default defineConfig(
             '@stylistic/member-delimiter-style': 'error',
             '@stylistic/multiline-ternary': 'error',
             '@stylistic/new-parens': 'error',
-            '@stylistic/no-extra-parens': 'error',
+            '@stylistic/no-extra-parens': ['error', 'all', {
+                nestedConditionalExpressions: false,
+            },],
             '@stylistic/no-extra-semi': 'error',
             '@stylistic/no-floating-decimal': 'error',
             '@stylistic/no-mixed-spaces-and-tabs': 'error',
@@ -556,9 +558,6 @@ export default defineConfig(
             'marcrock/uppercase-first-class-letter': 'error',
             'marcrock/no-newline-if-body-class-empty': 'error',
             'marcrock/numeric-separators': 'error',
-            'marcrock/prefer-at': ['error', {
-                checkAllIndexAccess: true,
-            },],
         },
     }
 );
