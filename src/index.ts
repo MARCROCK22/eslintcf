@@ -415,7 +415,7 @@ export default defineConfig(
             '@stylistic/nonblock-statement-body-position': ['error', 'below',],
             '@stylistic/object-curly-newline': 'error',
             '@stylistic/object-curly-spacing': ['error', 'always',],
-            // All the properties on one line are allowed: @stylistic/exp-list-style joins the lines of
+            // All the properties on one line are allowed: @stylistic/list-style joins the lines of
             // `{ a,\nb }` again, and the two rules would undo each other's fixes.
             '@stylistic/object-property-newline': ['error', { allowAllPropertiesOnSameLine: true, },],
             '@stylistic/one-var-declaration-per-line': 'error',
@@ -442,7 +442,7 @@ export default defineConfig(
             '@stylistic/type-generic-spacing': 'error',
             '@stylistic/type-named-tuple-spacing': 'error',
             '@stylistic/yield-star-spacing': 'error',
-            '@stylistic/exp-list-style': 'error',
+            '@stylistic/list-style': 'error',
             '@stylistic/exp-jsx-props-style': 'error',
         },
     },
