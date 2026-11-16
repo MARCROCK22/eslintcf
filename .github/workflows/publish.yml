@@ -1,0 +1,39 @@
+# Publishes the package to npm when a tag v<version> is pushed (the version of package.json):
+#
+#   git tag v0.0.3 && git push origin v0.0.3
+#
+# It needs the repository secret NPM_TOKEN (an npm token that can publish @marcrock22/eslintcf).
+name: publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: The tag is the version of package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "the tag $GITHUB_REF_NAME is not v$version, the version of package.json" >&2
+            exit 1
+          fi
+      - run: bun install --frozen-lockfile
+      # prepublishOnly builds dist and runs the tests.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
