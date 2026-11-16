@@ -1,6 +1,6 @@
 {
   "name": "@marcrock22/eslintcf",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "MARCROCK22's ESLint configuration for TypeScript: ESLint, typescript-eslint (type-checked), @stylistic, perfectionist and unicorn, plus a few rules of its own.",
   "type": "module",
   "main": "./dist/index.js",
