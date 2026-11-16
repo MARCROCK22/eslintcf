@@ -373,7 +373,6 @@ export default defineConfig({
         '@stylistic': stylistic,
     },
     rules: {
-        '@stylistic/array-bracket-spacing': 'error',
         '@stylistic/arrow-parens': 'error',
         '@stylistic/arrow-spacing': 'error',
         '@stylistic/block-spacing': 'error',
@@ -384,9 +383,7 @@ export default defineConfig({
         '@stylistic/computed-property-spacing': 'error',
         '@stylistic/dot-location': ['error', 'property',],
         '@stylistic/eol-last': 'error',
-        '@stylistic/function-call-argument-newline': ['error', 'consistent',],
         '@stylistic/function-call-spacing': 'error',
-        '@stylistic/function-paren-newline': ['error', 'consistent',],
         '@stylistic/implicit-arrow-linebreak': 'error',
         '@stylistic/key-spacing': 'error',
         '@stylistic/keyword-spacing': 'error',
@@ -404,11 +401,6 @@ export default defineConfig({
         '@stylistic/no-trailing-spaces': 'error',
         '@stylistic/no-whitespace-before-property': 'error',
         '@stylistic/nonblock-statement-body-position': ['error', 'below',],
-        '@stylistic/object-curly-newline': 'error',
-        '@stylistic/object-curly-spacing': ['error', 'always',],
-        // All the properties on one line are allowed: @stylistic/list-style joins the lines of
-        // `{ a,\nb }` again, and the two rules would undo each other's fixes.
-        '@stylistic/object-property-newline': ['error', { allowAllPropertiesOnSameLine: true, },],
         '@stylistic/one-var-declaration-per-line': 'error',
         '@stylistic/quote-props': ['error', 'as-needed',],
         '@stylistic/quotes': ['error', 'single',],
