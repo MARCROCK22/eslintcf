@@ -394,6 +394,8 @@ export default defineConfig({
         '@stylistic/new-parens': 'error',
         '@stylistic/no-extra-parens': ['error', 'all', {
                 nestedConditionalExpressions: false,
+                // no-return-assign (except-parens) accepts `() => (a = b)` only with the parentheses.
+                returnAssign: false,
             },],
         '@stylistic/no-extra-semi': 'error',
         '@stylistic/no-floating-decimal': 'error',
@@ -490,7 +492,9 @@ export default defineConfig({
         'unicorn/no-useless-promise-resolve-reject': 'error',
         'unicorn/no-useless-spread': 'error',
         'unicorn/no-useless-switch-case': 'error',
-        'unicorn/no-useless-undefined': 'error',
+        // `() => undefined` is the no-op @typescript-eslint/no-empty-function accepts; the rule's fix to
+        // `() => {}` would be reported by it, with no fix.
+        'unicorn/no-useless-undefined': ['error', { checkArrowFunctionBody: false, },],
         'unicorn/no-zero-fractions': 'error',
         'unicorn/prefer-array-flat': 'error',
         'unicorn/prefer-array-flat-map': 'error',
