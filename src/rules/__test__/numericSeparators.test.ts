@@ -27,6 +27,13 @@ ruleTester.run('numeric-separators', rule, {
         'const a = 0x1000;',
         'const a = 0b1010;',
         'const a = 1e5;',
+        'const a = 1E5;',
+        'const a = 0o755;',
+        'const a = 0o755n;',
+        'const a = 0O777777;',
+        'const a = 0B101010;',
+        'const a = 0X123456;',
+        'const a = 0x123456n;',
         // decimal where neither part needs grouping
         'const a = 1.5;',
     ],
@@ -39,6 +46,11 @@ ruleTester.run('numeric-separators', rule, {
         {
             code: 'const a = 1000000;',
             output: 'const a = 1_000_000;',
+            errors: [{ messageId: 'numericSeparators' }],
+        },
+        {
+            code: 'const a = 1000000n;',
+            output: 'const a = 1_000_000n;',
             errors: [{ messageId: 'numericSeparators' }],
         },
         {

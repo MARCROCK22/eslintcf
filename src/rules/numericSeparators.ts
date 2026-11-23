@@ -10,7 +10,9 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                         return;
                     }
 
-                    if (['e', '0x', '0b',].some((t) => node.raw.includes(t))) {
+                    // Hexadecimal, binary and octal literals (any case of the prefix) and exponents are left
+                    // as they are: a separator right after the prefix is a syntax error.
+                    if (/^0[box]/i.test(node.raw) || /e/i.test(node.raw)) {
                         return;
                     }
 

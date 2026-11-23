@@ -301,8 +301,8 @@ function lenBoundFromCmp(operator: string, c: number): number {
         case '>=': return c;
         case '!==':
         case '!=': return c === 0
-? 1
-: 0;
+            ? 1
+            : 0;
         default: return 0;
     }
 }
@@ -737,8 +737,8 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
                 const { init, } = def.node;
                 const isString = init.type === 'Literal' && typeof init.value === 'string' || init.type === 'TemplateLiteral';
                 if (isString
-? !isEffectivelyConst(objectNode)
-: !isNonEscapingArray(objectNode)) {
+                    ? !isEffectivelyConst(objectNode)
+                    : !isNonEscapingArray(objectNode)) {
                     return null;
                 }
                 return min;
