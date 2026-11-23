@@ -7,7 +7,6 @@ import createUseFilenamingConvention from '../useFilenamingConvention.js';
 RuleTester.afterAll = afterAll;
 RuleTester.describe = describe;
 RuleTester.it = it;
-RuleTester.itOnly = it.only;
 
 const createRule = ESLintUtils.RuleCreator(() => 'https://example.com/rule');
 const rule = createUseFilenamingConvention(createRule);
