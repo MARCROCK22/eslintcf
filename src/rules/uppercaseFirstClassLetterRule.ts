@@ -6,11 +6,11 @@ export default function create(createRule: ReturnType<typeof ESLintUtils.RuleCre
             return {
                 ClassDeclaration(node) {
                     if (node.id !== null && /^[a-z]/.test(node.id.name)) {
-                            context.report({
-                                messageId: 'uppercaseFirstClassLeter',
-                                node: node.id,
-                            });
-                        }
+                        context.report({
+                            messageId: 'uppercaseFirstClassLeter',
+                            node: node.id,
+                        });
+                    }
                 },
             };
         },

@@ -394,6 +394,7 @@ export default defineConfig(
             '@stylistic/eol-last': 'error',
             '@stylistic/function-call-spacing': 'error',
             '@stylistic/implicit-arrow-linebreak': 'error',
+            '@stylistic/indent': 'error',
             '@stylistic/key-spacing': 'error',
             '@stylistic/keyword-spacing': 'error',
             '@stylistic/lines-between-class-members': 'error',
